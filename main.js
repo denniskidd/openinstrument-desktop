@@ -1,7 +1,37 @@
 const { app, BrowserWindow, ipcMain, session, Menu, screen } = require('electron');
+const { autoUpdater } = require('electron-updater');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
+
+// ── AUTO‐UPDATER EVENTS ───────────────────────────────────────────────────────
+autoUpdater.on('checking-for-update', () => {
+  console.log('AutoUpdater: Checking for update...');
+});
+autoUpdater.on('update-available', info => {
+  console.log('AutoUpdater: Update available:', info.version);
+});
+autoUpdater.on('update-not-available', () => {
+  console.log('AutoUpdater: No updates found.');
+});
+autoUpdater.on('download-progress', progress => {
+  console.log(`AutoUpdater: Downloading ${Math.round(progress.percent)}%`);
+});
+autoUpdater.on('update-downloaded', () => {
+  console.log('AutoUpdater: Update downloaded; prompting user…');
+  dialog.showMessageBox({
+    type: 'info',
+    title: 'Update Ready',
+    message: 'A new version has been downloaded. Restart now to apply?',
+    buttons: ['Restart', 'Later']
+  }).then(({ response }) => {
+    if (response === 0) autoUpdater.quitAndInstall();
+  });
+});
+autoUpdater.on('error', err => {
+  console.error('AutoUpdater error:', err);
+});
+// ──────────────────────────────────────────────────────────────────────────────
 
 let mainWindow;
 let sessionPanel;
@@ -394,6 +424,7 @@ app.whenReady().then(async () => {
     await cleanupPreviousSession(instUuid);
   }
   createLoginWindow();
+  autoUpdater.checkForUpdatesAndNotify(); // Check for updates
 });
 
 ipcMain.on('exit-bypass', () => {

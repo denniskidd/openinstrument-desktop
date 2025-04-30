@@ -19,7 +19,7 @@
     "publish": [
       {
         "provider": "github",
-        "owner": "dennis.kidd@gmail.com",
+        "owner": "denniskidd",
         "repo": "openrequest-electron-app"
       }
     ],
