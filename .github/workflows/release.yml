@@ -30,4 +30,4 @@ jobs:
       - name: Build and publish (electron-builder)
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
-        run: npm run dist
+        run: npm run dist -- --publish=always
