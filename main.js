@@ -39,8 +39,12 @@ let reservationWindow;
 let lastUsername = 'User';
 let loginWatcherInterval = null;
 
+function getInstrumentConfigPath() {
+  return path.join(app.getPath('userData'), 'instrument-config.json');
+}
+
 function loadInstrumentUuid() {
-  const configPath = path.join(__dirname, 'instrument-config.json');
+  const configPath = getInstrumentConfigPath();
   if (fs.existsSync(configPath)) {
     const data = fs.readFileSync(configPath);
     return JSON.parse(data).instrumentUuid;
@@ -50,9 +54,17 @@ function loadInstrumentUuid() {
 
 function saveInstrumentConfig(config) {
   fs.writeFileSync(
-    path.join(__dirname, 'instrument-config.json'),
+    getInstrumentConfigPath(),
     JSON.stringify(config, null, 2) // nicely formatted
   );
+}
+
+function loadInstrumentConfig() {
+  const configPath = getInstrumentConfigPath();
+  if (fs.existsSync(configPath)) {
+    return JSON.parse(fs.readFileSync(configPath, 'utf8'));
+  }
+  return null;
 }
 
 function startHeartbeat(instrumentUuid) {
