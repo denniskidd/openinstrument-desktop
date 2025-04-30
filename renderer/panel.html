@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Session Active</title>
+    <style>
+      body {
+        background: #222;
+        color: #fff;
+        font-family: sans-serif;
+        font-size: 20px;
+      }
+      #container {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        width: 100%;
+        max-width: 100vw;
+        box-sizing: border-box;
+        -webkit-app-region: drag;
+        padding: 1rem 1.5rem;
+      }
+      button {
+        background: red;
+        border: none;
+        padding: 10px 20px;
+        color: white;
+        font-size: 16px;
+        cursor: pointer;
+        border-radius: 8px;
+        -webkit-app-region: no-drag;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="container">
+      <div><span id="username">...</span></div>
+      <div>Session Active — <span id="timer">00:00</span></div>
+      <div>
+        <button onclick="stopSession()">Stop</button>
+      </div>
+    </div>
+
+    <script>
+      let token, sessionId;
+      let startTime, endTime, timerInterval;
+
+      window.electronAPI.onSessionInfo((data) => {
+        document.getElementById("username").innerText =
+          data?.username?.trim() || "User";
+        token = data.token;
+        sessionId = data.sessionId;
+        endTime = new Date(data.endTime);
+
+        startTime = new Date();
+        timerInterval = setInterval(updateTimer, 1000);
+
+        //check for admin status
+        let isAdmin = false;
+
+        async function checkAdminStatus() {
+          try {
+            const response = await fetch(
+              `https://openrequest.jh.edu/api/instruments/${instrumentUuid}/admin-check`,
+              {
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                },
+              }
+            );
+
+            if (response.ok) {
+              const data = await response.json();
+              isAdmin = data.is_admin;
+              if (isAdmin) {
+                document.getElementById("bypassButton").style.display = "block";
+              }
+            } else {
+              console.error("Failed to check admin status.");
+            }
+          } catch (err) {
+            console.error("Error checking admin status:", err);
+          }
+        }
+      });
+
+      let sessionExpired = false;
+
+      function updateTimer() {
+        const now = new Date();
+        const diff = Math.floor((now - startTime) / 1000);
+
+        const hours = String(Math.floor(diff / 3600)).padStart(2, "0");
+        const minutes = String(Math.floor((diff % 3600) / 60)).padStart(2, "0");
+        const seconds = String(diff % 60).padStart(2, "0");
+
+        const timerEl = document.getElementById("timer");
+        timerEl.innerText = `${hours}:${minutes}:${seconds}`;
+
+        if (endTime && now > endTime && !sessionExpired) {
+          timerEl.style.color = "red";
+          sessionExpired = true;
+        }
+      }
+
+      function stopSession() {
+        if (confirm("Are you sure you want to stop the session?")) {
+          clearInterval(timerInterval);
+          window.electronAPI.sendStopSession({ token, sessionId });
+        }
+      }
+    </script>
+  </body>
+</html>

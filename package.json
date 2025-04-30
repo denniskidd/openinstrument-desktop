@@ -1,0 +1,39 @@
+{
+  "name": "openrequest-electron",
+  "productName": "OpenRequest Secure Desktop",
+  "version": "1.0.0",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "devDependencies": {
+    "electron": "^35.2.0"
+  },
+  "build": {
+    "appId": "edu.jh.openrequest",
+    "productName": "OpenRequest",
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "dennis.kidd@gmail.com",
+        "repo": "openrequest-electron-app"
+      }
+    ],
+    "directories": {
+      "buildResources": "assets"
+    },
+    "files": [
+      "dist/**",
+      "main.js",
+      "preload.js",
+      "renderer/**"
+    ]
+  },
+  "dependencies": {
+    "electron-updater": "^6.6.2"
+  }
+}
