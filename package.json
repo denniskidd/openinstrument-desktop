@@ -5,14 +5,15 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-     "dist": "electron-builder"
+    "dist": "electron-builder"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "description": "",
   "devDependencies": {
-    "electron": "^35.2.0"
+    "electron": "^35.2.0",
+    "electron-builder": "^26.0.12"
   },
   "build": {
     "appId": "edu.jh.openrequest",
