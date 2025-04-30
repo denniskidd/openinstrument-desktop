@@ -27,7 +27,22 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Setup Code Signing Certificate (macOS only)
+        if: matrix.os == 'macos-latest'
+        run: |
+          echo "$CERT_P12" | base64 --decode > certificate.p12
+          security create-keychain -p "" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "" build.keychain
+          security import certificate.p12 -k build.keychain -P "$CERT_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "" build.keychain
+        env:
+          CERT_P12: ${{ secrets.CERT_P12 }}
+          CERT_PASSWORD: ${{ secrets.CERT_PASSWORD }}
+
       - name: Build and publish (electron-builder)
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_ID_PASS: ${{ secrets.APPLE_ID_PASS }}
         run: npm run dist -- --publish=always

@@ -18,6 +18,13 @@
   "build": {
     "appId": "edu.jh.openrequest",
     "productName": "OpenRequest",
+    "afterSign": "build/notarize.js",
+    "mac": {
+      "hardenedRuntime": true,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "gatekeeperAssess": false
+    },
     "publish": [
       {
         "provider": "github",
