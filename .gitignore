@@ -3,7 +3,9 @@ node_modules/
 
 # Build artifacts
 /dist/
-/build/
+/build/*
+!/build/notarize.js
+!/build/entitlements.mac.plist
 /out/
 /*.dmg
 /*.exe
