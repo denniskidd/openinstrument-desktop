@@ -33,7 +33,10 @@
       "main.js",
       "preload.js",
       "renderer/**"
-    ]
+    ],
+    "linux": {
+     "target": [ "AppImage" ]
+    }
   },
   "dependencies": {
     "electron-updater": "^6.6.2"
