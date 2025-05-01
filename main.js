@@ -4,6 +4,8 @@ const path = require('path');
 const fs = require('fs');
 const os = require('os');
 
+app.commandLine.appendSwitch('js-flags', '--jitless');
+
 // ── AUTO‐UPDATER EVENTS ───────────────────────────────────────────────────────
 autoUpdater.on('checking-for-update', () => {
   console.log('AutoUpdater: Checking for update...');

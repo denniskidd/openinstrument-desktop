@@ -45,7 +45,7 @@
     ],
     "linux": {
       "target": [
-        "AppImage"
+        "AppImage", "rpm"
       ]
     }
   },
