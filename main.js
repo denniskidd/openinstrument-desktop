@@ -13,7 +13,7 @@ autoUpdater.setFeedURL({
   url: 'https://openrequest-secure-desktop.s3.us-east-1.amazonaws.com/updates/' 
 });
 
-// ── AUTO‐UPDATER EVENTS ───────────────────────────────────────────────────────
+// Update events
 autoUpdater.on('checking-for-update', () => {
   console.log('AutoUpdater: Checking for update...');
 });
@@ -28,19 +28,11 @@ autoUpdater.on('download-progress', progress => {
 });
 autoUpdater.on('update-downloaded', () => {
   console.log('AutoUpdater: Update downloaded; prompting user…');
-  dialog.showMessageBox({
-    type: 'info',
-    title: 'Update Ready',
-    message: 'A new version has been downloaded. Restart now to apply?',
-    buttons: ['Restart', 'Later']
-  }).then(({ response }) => {
-    if (response === 0) autoUpdater.quitAndInstall();
-  });
+  autoUpdater.quitAndInstall();
 });
 autoUpdater.on('error', err => {
   console.error('AutoUpdater error:', err);
 });
-// ──────────────────────────────────────────────────────────────────────────────
 
 let mainWindow;
 let sessionPanel;
@@ -83,7 +75,7 @@ function startHeartbeat(instrumentUuid) {
   const hostname   = os.hostname();
   const appVersion = app.getVersion();
 
-  setInterval(async () => {
+  const sendHeartbeat = async () => {
     try {
       await fetch(
         `https://openrequest.jh.edu/api/instruments/${instrumentUuid}/heartbeat`,
@@ -102,7 +94,43 @@ function startHeartbeat(instrumentUuid) {
     } catch (err) {
       console.error('Heartbeat failed:', err);
     }
-  }, intervalMs);
+  };
+
+  sendHeartbeat(); // Send immediately on start
+  setInterval(sendHeartbeat, intervalMs);
+}
+
+function scheduleSilentAutoUpdateCheck() {
+  const instrumentUuid = loadInstrumentUuid();
+
+  const checkUpdateIfIdle = async () => {
+    // Only run update if app is on main login screen and no session is active
+    if (
+      mainWindow &&
+      !sessionPanel &&
+      !reservationWindow &&
+      mainWindow.webContents &&
+      mainWindow.webContents.getURL().includes('/desktop-welcome') &&
+      instrumentUuid
+    ) {
+      try {
+        await autoUpdater.checkForUpdates();
+      } catch (err) {
+        console.error('Silent update check failed:', err);
+      }
+    }
+  };
+
+  // Calculate milliseconds until next midnight
+  const now = new Date();
+  const nextMidnight = new Date();
+  nextMidnight.setHours(24, 0, 0, 0);
+  const initialDelay = nextMidnight - now;
+
+  setTimeout(() => {
+    checkUpdateIfIdle();
+    setInterval(checkUpdateIfIdle, 24 * 60 * 60 * 1000); // Every 24h
+  }, initialDelay);
 }
 
 // Cleanup function for previous session
@@ -441,7 +469,7 @@ app.whenReady().then(async () => {
     await cleanupPreviousSession(instUuid);
   }
   createLoginWindow();
-  autoUpdater.checkForUpdatesAndNotify(); // Check for updates
+  scheduleSilentAutoUpdateCheck();
 });
 
 ipcMain.on('exit-bypass', () => {
