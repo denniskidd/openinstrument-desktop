@@ -10,7 +10,7 @@ exports.default = async function notarizeApp(context) {
   console.log('🔐 Notarizing with notarytool...');
 
   await notarize({
-    appBundleId: 'edu.jhu.openrequest',
+    appBundleId: 'edu.jh.openrequest',
     appPath: `${appOutDir}/${appName}.app`,
     appleId: process.env.APPLE_ID,
     appleIdPassword: process.env.APPLE_ID_PASS,
