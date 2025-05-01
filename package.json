@@ -10,7 +10,7 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "description": "",
+  "description": "The OpenRequest desktop app for managing lab reservations",
   "devDependencies": {
     "electron": "^35.2.0",
     "electron-builder": "^26.0.12",
@@ -22,9 +22,6 @@
     "afterSign": "build/notarize.js",
     "mac": {
       "target": "dmg",
-      "arch": [
-        "arm64"
-      ],
       "hardenedRuntime": true,
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.plist",
