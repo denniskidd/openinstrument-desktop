@@ -9,8 +9,8 @@
   },
   "keywords": [],
   "author": {
-  "name": "Dennis Kidd",
-  "email": "dennis.kidd@gmail.com"
+    "name": "Dennis Kidd",
+    "email": "dennis.kidd@gmail.com"
   },
   "license": "ISC",
   "description": "The OpenRequest desktop app for managing lab reservations",
@@ -48,11 +48,13 @@
     ],
     "linux": {
       "target": [
-        "AppImage", "rpm"
+        "AppImage",
+        "rpm"
       ]
     }
   },
   "dependencies": {
+    "electron-log": "^5.3.4",
     "electron-updater": "^6.6.2"
   }
 }

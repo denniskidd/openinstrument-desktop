@@ -1,10 +1,12 @@
-const { app, BrowserWindow, ipcMain, session, Menu, screen } = require('electron');
+const { app, BrowserWindow, ipcMain, session, Menu, screen, dialog } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
+const log = require('electron-log');
 
-app.commandLine.appendSwitch('js-flags', '--jitless');
+autoUpdater.logger = log;
+autoUpdater.logger.transports.file.level = 'info';
 
 // ── AUTO‐UPDATER EVENTS ───────────────────────────────────────────────────────
 autoUpdater.on('checking-for-update', () => {
