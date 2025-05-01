@@ -8,7 +8,10 @@
     "dist": "electron-builder"
   },
   "keywords": [],
-  "author": "",
+  "author": {
+  "name": "Dennis Kidd",
+  "email": "dennis.kidd@gmail.com"
+  },
   "license": "ISC",
   "description": "The OpenRequest desktop app for managing lab reservations",
   "devDependencies": {
