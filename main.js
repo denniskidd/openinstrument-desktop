@@ -137,7 +137,7 @@ function createLoginWindow() {
     mainWindow = new BrowserWindow({
       width: 1080,
       height: 800,
-      backgroundColor: '#111827', // <-- Tailwind "gray-900"
+      backgroundColor: '#111827', 
       resizable: false,
       fullscreenable: false,
       frame: false,
@@ -229,10 +229,6 @@ function createSessionPanel(token, username, sessionId, endTime) {
   sessionPanel.focus();
   sessionPanel.show();
 
-  // sessionPanel.setPosition(
-  //   Math.floor((1920 - 500) / 2), // center top (adjust width/screen size as needed)
-  //   0
-  // );
   sessionPanel.loadFile('renderer/panel.html');
   sessionPanel.webContents.once('did-finish-load', () => {
     sessionPanel.webContents.send('session-info', { token, username, sessionId, endTime });
