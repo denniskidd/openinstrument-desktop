@@ -1,7 +1,7 @@
 {
   "name": "openrequest-electron",
   "productName": "OpenRequest Secure Desktop",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -15,7 +15,7 @@
   "license": "ISC",
   "description": "The OpenRequest desktop app for managing lab reservations",
   "devDependencies": {
-    "electron": "^35.2.0",
+    "electron": "^36.0.0",
     "electron-builder": "^26.0.12",
     "electron-notarize": "^1.2.2"
   },
@@ -28,7 +28,8 @@
       "hardenedRuntime": true,
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.plist",
-      "gatekeeperAssess": false
+      "gatekeeperAssess": false,
+      "universal": true
     },
     "publish": [
       {
