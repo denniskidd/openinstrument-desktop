@@ -8,6 +8,11 @@ const log = require('electron-log');
 autoUpdater.logger = log;
 autoUpdater.logger.transports.file.level = 'info';
 
+autoUpdater.setFeedURL({
+  provider: 'generic',
+  url: 'https://openrequest-secure-desktop.s3.us-east-1.amazonaws.com/updates/' 
+});
+
 // ── AUTO‐UPDATER EVENTS ───────────────────────────────────────────────────────
 autoUpdater.on('checking-for-update', () => {
   console.log('AutoUpdater: Checking for update...');
