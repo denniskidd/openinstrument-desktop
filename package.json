@@ -21,6 +21,10 @@
     "productName": "OpenRequest",
     "afterSign": "build/notarize.js",
     "mac": {
+      "target": "dmg",
+      "arch": [
+        "arm64"
+      ],
       "hardenedRuntime": true,
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.plist",
