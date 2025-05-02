@@ -21,7 +21,7 @@
   },
   "build": {
     "appId": "edu.jh.openrequest",
-    "productName": "OpenRequest",
+    "productName": "OpenRequest Secure Desktop",
     "afterSign": "build/notarize.js",
     "mac": {
       "target": "dmg",
