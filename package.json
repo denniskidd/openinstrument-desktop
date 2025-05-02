@@ -29,7 +29,7 @@
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.plist",
       "gatekeeperAssess": false,
-      "identity": "Developer ID Application: Dennis Kidd (HTBVK54EU9)"
+      "identity": "Dennis Kidd (HTBVK54EU9)"
     },
     "publish": [
       {
