@@ -31,6 +31,12 @@
       "gatekeeperAssess": false,
       "identity": "Dennis Kidd (HTBVK54EU9)"
     },
+    "extraResources": [
+      {
+        "from": "assets/openrequest.desktop",
+        "to": "openrequest.desktop"
+      }
+    ],
     "publish": [
       {
         "provider": "github",
@@ -53,11 +59,7 @@
         "rpm",
         "deb"
       ],
-      "category": "Utility",
-      "desktop": {
-        "StartupWMClass": "openrequest-secure-desktop",
-        "X-GNOME-Autostart-enabled": "true"
-      }
+      "category": "Utility"
     }
   },
   "dependencies": {

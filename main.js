@@ -464,6 +464,23 @@ app.whenReady().then(async () => {
     openAtLogin: true,
     path: app.getPath('exe')
   });
+  if (process.platform === 'linux') {
+    const autostartPath = path.join(os.homedir(), '.config', 'autostart');
+    const autostartFile = path.join(autostartPath, 'openrequest.desktop');
+    const appDesktopFile = path.join(process.resourcesPath, 'openrequest.desktop');
+  
+    fs.mkdirSync(autostartPath, { recursive: true });
+  
+    if (!fs.existsSync(autostartFile)) {
+      fs.copyFile(appDesktopFile, autostartFile, err => {
+        if (err) {
+          console.error('Failed to copy autostart .desktop file:', err);
+        } else {
+          console.log('✅ Autostart .desktop file installed.');
+        }
+      });
+    }
+  }
   if (process.platform === 'darwin') {
     app.dock.hide();
   }
