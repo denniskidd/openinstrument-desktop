@@ -460,6 +460,10 @@ ipcMain.on('start-bypass', async (event, { token }) => {
 });
 
 app.whenReady().then(async () => {
+  app.setLoginItemSettings({
+    openAtLogin: true,
+    path: app.getPath('exe')
+  });
   if (process.platform === 'darwin') {
     app.dock.hide();
   }
