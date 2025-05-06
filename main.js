@@ -100,28 +100,27 @@ function startHeartbeat(instrumentUuid) {
   setInterval(sendHeartbeat, intervalMs);
 }
 
-function scheduleSilentAutoUpdateCheck() {
+function checkUpdateIfIdle() {
   const instrumentUuid = loadInstrumentUuid();
-
-  const checkUpdateIfIdle = async () => {
-    // Only run update if app is on main login screen and no session is active
+  if (
+    mainWindow &&
+    !sessionPanel &&
+    !reservationWindow &&
+    mainWindow.webContents
+  ) {
+   // console.log('🧪 Current URL during update check:', mainWindow.webContents.getURL());
     if (
-      mainWindow &&
-      !sessionPanel &&
-      !reservationWindow &&
-      mainWindow.webContents &&
-      mainWindow.webContents.getURL().includes('/desktop-welcome') &&
-      instrumentUuid
+      mainWindow.webContents.getURL().toLowerCase().includes('desktop-welcome')
     ) {
-      try {
-        await autoUpdater.checkForUpdates();
-      } catch (err) {
-        console.error('Silent update check failed:', err);
-      }
+      console.log('Checking for updates...');
+      autoUpdater.checkForUpdates().catch(err => {
+        console.error('Update check failed:', err);
+      });
     }
-  };
+  }
+}
 
-  // Calculate milliseconds until next midnight
+function scheduleSilentAutoUpdateCheck() {
   const now = new Date();
   const nextMidnight = new Date();
   nextMidnight.setHours(24, 0, 0, 0);
@@ -204,6 +203,9 @@ function createLoginWindow() {
         clearInterval(loginWatcherInterval);
       }
 
+      // Run update check right after welcome screen loads and URL is available
+      checkUpdateIfIdle();
+
       loginWatcherInterval = setInterval(() => {
         if (!mainWindow) return;
 
@@ -231,7 +233,7 @@ function createSessionPanel(token, username, sessionId, endTime) {
   const { width: screenWidth, height: screenHeight } = screen.getPrimaryDisplay().workAreaSize;
 
   const windowWidth = 1080;
-  const windowHeight = 90;
+  const windowHeight = 80;
 
   const x = Math.floor((screenWidth - windowWidth) / 2);
   const y = Math.floor((screenHeight - windowHeight) / 2);
@@ -298,7 +300,7 @@ function createBypassPanel(token) {
   const { width: screenWidth, height: screenHeight } = screen.getPrimaryDisplay().workAreaSize;
 
   const windowWidth = 1080;
-  const windowHeight = 90;
+  const windowHeight = 80;
 
   const x = Math.floor((screenWidth - windowWidth) / 2);
   const y = Math.floor((screenHeight - windowHeight) / 2);
@@ -489,7 +491,9 @@ app.whenReady().then(async () => {
   if (instUuid) {
     await cleanupPreviousSession(instUuid);
   }
+
   createLoginWindow();
+  
   scheduleSilentAutoUpdateCheck();
 });
 
@@ -504,6 +508,11 @@ ipcMain.on('exit-bypass', () => {
 });
 
 ipcMain.on('app-exit', () => {
+  BrowserWindow.getAllWindows().forEach(win => {
+    win.allowClose = true;
+    win.close();
+    win.destroy();
+  });
   app.quit();
 });
 
