@@ -100,22 +100,27 @@ function startHeartbeat(instrumentUuid) {
   setInterval(sendHeartbeat, intervalMs);
 }
 
-function checkUpdateIfIdle() {
+async function checkUpdateIfIdle() {
   const instrumentUuid = loadInstrumentUuid();
   if (
     mainWindow &&
     !sessionPanel &&
     !reservationWindow &&
-    mainWindow.webContents
+    mainWindow.webContents &&
+    mainWindow.webContents.getURL().toLowerCase().includes('desktop-welcome')
   ) {
-   // console.log('🧪 Current URL during update check:', mainWindow.webContents.getURL());
-    if (
-      mainWindow.webContents.getURL().toLowerCase().includes('desktop-welcome')
-    ) {
-      console.log('Checking for updates...');
-      autoUpdater.checkForUpdates().catch(err => {
-        console.error('Update check failed:', err);
-      });
+    try {
+      const res = await fetch(`https://openrequest.jh.edu/api/instruments/${instrumentUuid}`);
+      const data = await res.json();
+
+      if (data.can_update) {
+        console.log('🔄 Checking for update (allowed by server)');
+        await autoUpdater.checkForUpdates();
+      } else {
+        console.log('🚫 Skipping update — server says not allowed');
+      }
+    } catch (err) {
+      console.error('❌ Failed to fetch update permission:', err);
     }
   }
 }
