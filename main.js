@@ -1,4 +1,9 @@
 const { app, BrowserWindow, ipcMain, session, Menu, screen } = require('electron');
+
+if (process.platform === 'linux') {
+  app.commandLine.appendSwitch('gtk-version', '3');
+}
+
 const { autoUpdater } = require('electron-updater');
 const path = require('path');
 const fs = require('fs');
