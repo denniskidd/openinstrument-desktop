@@ -1,7 +1,7 @@
 {
   "name": "openrequest-electron",
   "productName": "OpenRequest Secure Desktop",
-  "version": "1.0.10",
+  "version": "1.0.9",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -36,7 +36,7 @@
     },
     "extraResources": [
       {
-        "from": "build/linux/openrequest.desktop",
+        "from": "assets/openrequest.desktop",
         "to": "openrequest.desktop"
       }
     ],
@@ -54,8 +54,7 @@
       "dist/**",
       "main.js",
       "preload.js",
-      "renderer/**",
-      "build/linux/openrequest.desktop"
+      "renderer/**"
     ],
     "linux": {
       "target": [
@@ -63,8 +62,7 @@
         "rpm",
         "deb"
       ],
-      "category": "Utility",
-      "desktop": "build/linux/openrequest.desktop"
+      "category": "Utility"
     }
   },
   "dependencies": {

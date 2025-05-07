@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=OpenRequest Secure Desktop
+Exec=env GTK_PATH=/usr/lib64/gtk-3.0 /opt/OpenRequest/OpenRequest
+Icon=openrequest
+X-GNOME-Autostart-enabled=true
+NoDisplay=false
+Terminal=false
+Categories=Utility;
