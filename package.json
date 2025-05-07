@@ -1,7 +1,7 @@
 {
   "name": "openrequest-electron",
   "productName": "OpenRequest Secure Desktop",
-  "version": "1.0.9",
+  "version": "1.0.10",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -24,7 +24,10 @@
     "productName": "OpenRequest Secure Desktop",
     "afterSign": "build/notarize.js",
     "mac": {
-      "target": "zip",
+      "target": [
+        "zip",
+        "dmg"
+      ],
       "hardenedRuntime": true,
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.plist",
@@ -33,7 +36,7 @@
     },
     "extraResources": [
       {
-        "from": "assets/openrequest.desktop",
+        "from": "build/linux/openrequest.desktop",
         "to": "openrequest.desktop"
       }
     ],
@@ -51,7 +54,8 @@
       "dist/**",
       "main.js",
       "preload.js",
-      "renderer/**"
+      "renderer/**",
+      "build/linux/openrequest.desktop"
     ],
     "linux": {
       "target": [
@@ -59,7 +63,8 @@
         "rpm",
         "deb"
       ],
-      "category": "Utility"
+      "category": "Utility",
+      "desktop": "build/linux/openrequest.desktop"
     }
   },
   "dependencies": {

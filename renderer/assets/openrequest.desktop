@@ -1,9 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=OpenRequest Secure Desktop
-Exec=/opt/OpenRequest Secure Desktop/OpenRequest %U
-Icon=openrequest
-X-GNOME-Autostart-enabled=true
-NoDisplay=false
-Terminal=false
-Categories=Utility;
