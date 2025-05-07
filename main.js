@@ -1,9 +1,10 @@
-const { app, BrowserWindow, ipcMain, session, Menu, screen, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, session, Menu, screen } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
 const log = require('electron-log');
+const { powerMonitor } = require('electron'); //for waking app from sleep
 
 autoUpdater.logger = log;
 autoUpdater.logger.transports.file.level = 'info';
@@ -488,6 +489,10 @@ app.whenReady().then(async () => {
       });
     }
   }
+
+  const { powerSaveBlocker } = require('electron');
+  const blockerId = powerSaveBlocker.start('prevent-display-sleep')
+
   if (process.platform === 'darwin') {
     app.dock.hide();
   }
@@ -500,6 +505,26 @@ app.whenReady().then(async () => {
   createLoginWindow();
   
   scheduleSilentAutoUpdateCheck();
+
+  powerMonitor.on('resume', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      console.log('💤 System resumed — reloading main window');
+      mainWindow.reload();
+      mainWindow.show();
+      mainWindow.focus();
+      mainWindow.setKiosk(true);
+    }
+  });
+
+  powerMonitor.on('unlock-screen', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      console.log('🔓 Screen unlocked — reloading window');
+      mainWindow.reload();
+      mainWindow.show();
+      mainWindow.focus();
+      mainWindow.setKiosk(true);
+    }
+  });
 });
 
 ipcMain.on('exit-bypass', () => {
