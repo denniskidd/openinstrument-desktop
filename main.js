@@ -13,6 +13,11 @@ const { powerMonitor } = require('electron'); //for waking app from sleep
 
 autoUpdater.logger = log;
 autoUpdater.logger.transports.file.level = 'info';
+autoUpdater.allowDowngrade = false;
+autoUpdater.fullChangelog = false;
+autoUpdater.autoDownload = true;
+autoUpdater.autoInstallOnAppQuit = true;
+autoUpdater.requestHeaders = { "Cache-Control": "no-cache" };
 
 autoUpdater.setFeedURL({
   provider: 'generic',
@@ -32,9 +37,24 @@ autoUpdater.on('update-not-available', () => {
 autoUpdater.on('download-progress', progress => {
   console.log(`AutoUpdater: Downloading ${Math.round(progress.percent)}%`);
 });
+// Update downloaded event — moved outside to reflect better control flow
 autoUpdater.on('update-downloaded', () => {
-  console.log('AutoUpdater: Update downloaded; prompting user…');
-  autoUpdater.quitAndInstall();
+  console.log('AutoUpdater: Update downloaded — checking if safe to quit and install…');
+
+  const currentUrl = mainWindow?.webContents?.getURL()?.toLowerCase() || '';
+  const isIdle = (
+    mainWindow &&
+    currentUrl.includes('desktop-welcome') &&
+    !sessionPanel &&
+    !reservationWindow
+  );
+
+  if (isIdle) {
+    console.log('✅ App is idle — quitting and installing update');
+    autoUpdater.quitAndInstall();
+  } else {
+    console.log('🛑 App is in use — skipping auto quit/install');
+  }
 });
 autoUpdater.on('error', err => {
   console.error('AutoUpdater error:', err);
@@ -214,8 +234,7 @@ function createLoginWindow() {
         clearInterval(loginWatcherInterval);
       }
 
-      // Run update check right after welcome screen loads and URL is available
-      checkUpdateIfIdle();
+      // Removed update check on load to prevent update checks on app launch
 
       loginWatcherInterval = setInterval(() => {
         if (!mainWindow) return;
@@ -244,7 +263,7 @@ function createSessionPanel(token, username, sessionId, endTime) {
   const { width: screenWidth, height: screenHeight } = screen.getPrimaryDisplay().workAreaSize;
 
   const windowWidth = 1080;
-  const windowHeight = 80;
+  const windowHeight = 84;
 
   const x = Math.floor((screenWidth - windowWidth) / 2);
   const y = Math.floor((screenHeight - windowHeight) / 2);
@@ -311,7 +330,7 @@ function createBypassPanel(token) {
   const { width: screenWidth, height: screenHeight } = screen.getPrimaryDisplay().workAreaSize;
 
   const windowWidth = 1080;
-  const windowHeight = 80;
+  const windowHeight = 84;
 
   const x = Math.floor((screenWidth - windowWidth) / 2);
   const y = Math.floor((screenHeight - windowHeight) / 2);
