@@ -58,4 +58,4 @@ jobs:
 
       - name: Upload release files to S3
         run: |
-          aws s3 cp dist/ "s3://${{ secrets.S3_BUCKET_NAME }}/updates/" --recursive --acl public-read
+          aws s3 cp dist/ "s3://openrequest-secure-desktop/updates/" --recursive --acl public-read
