@@ -57,7 +57,5 @@ jobs:
           aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Upload release files to S3
-        env:
-          S3_BUCKET_NAME: ${{ secrets.S3_BUCKET_NAME }}
         run: |
           aws s3 sync dist/ "s3://${{ secrets.S3_BUCKET_NAME }}/updates/" --acl public-read --delete
