@@ -60,4 +60,4 @@ jobs:
         env:
           S3_BUCKET_NAME: ${{ secrets.S3_BUCKET_NAME }}
         run: |
-          aws s3 sync dist/ "s3://$S3_BUCKET_NAME/updates/" --acl public-read --delete
+          aws s3 sync dist/ "s3://${{ secrets.S3_BUCKET_NAME }}/updates/" --acl public-read --delete
