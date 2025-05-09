@@ -8,7 +8,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onReservationData: (callback) => ipcRenderer.on('reservation-data', (event, data) => callback(data)),
   onSessionInfo: (callback) => ipcRenderer.on('session-info', (event, data) => callback(data)),
   sendExitBypass: () => ipcRenderer.send('exit-bypass'),
-  exitApp: () => ipcRenderer.send('app-exit')
+  exitApp: () => ipcRenderer.send('app-exit'),
+  sendManualUpdateCheck: () => ipcRenderer.send('manual-update-check'),
+  checkForUpdateAvailable: () => ipcRenderer.invoke('check-update-available'),
+  onUpdateProgress: (callback) => ipcRenderer.on('update-progress', (event, progress) => callback(progress)),
 });
 
 window.addEventListener('message', (event) => {
@@ -25,3 +28,4 @@ window.addEventListener('message', (event) => {
     console.error('❌ Token parse failed:', err);
   }
 });
+

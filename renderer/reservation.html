@@ -67,6 +67,17 @@
     </div>
 
     <div class="absolute bottom-8 right-12">
+      <div id="updateStatus" class="text-yellow-400 text-lg mt-4 hidden">
+        Downloading update...
+      </div>
+      <button
+        id="updateBtn"
+        onclick="manualUpdate()"
+        class="border border-yellow-400 text-white py-2 px-6 text-2xl rounded-full hover:bg-yellow-400 hover:text-gray-900 transition hidden mr-2"
+      >
+        Update App
+      </button>
+
       <button
         id="bypassButton"
         onclick="startBypass()"
@@ -88,6 +99,12 @@
       let token, instrumentUuid, reservationId;
       let upcoming;
 
+      function manualUpdate() {
+        if (confirm("Check for updates and install if available?")) {
+          window.electronAPI.sendManualUpdateCheck();
+        }
+      }
+
       window.electronAPI.onReservationData(async (data) => {
         token = data.token;
         instrumentUuid = data.instrumentUuid;
@@ -97,6 +114,12 @@
         const welcome = document.getElementById("welcome");
 
         document.getElementById("cancelBtn").classList.remove("hidden");
+
+        const updateBtn = document.getElementById("updateBtn");
+        const hasUpdate = await window.electronAPI.checkForUpdateAvailable();
+        if (hasUpdate) {
+          updateBtn.classList.remove("hidden");
+        }
 
         const res = await fetch(
           `https://openrequest.jh.edu/api/reservations?instrument_uuid=${instrumentUuid}`,
@@ -140,6 +163,12 @@
 
         //check admin status
         await checkAdminStatus();
+      });
+
+      window.electronAPI.onUpdateProgress((percent) => {
+        const status = document.getElementById("updateStatus");
+        status.classList.remove("hidden");
+        status.textContent = `Downloading update... ${percent}%`;
       });
 
       async function checkAdminStatus() {

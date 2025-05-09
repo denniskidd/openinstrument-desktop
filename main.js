@@ -36,6 +36,9 @@ autoUpdater.on('update-not-available', () => {
 });
 autoUpdater.on('download-progress', progress => {
   console.log(`AutoUpdater: Downloading ${Math.round(progress.percent)}%`);
+  if (mainWindow) {
+    mainWindow.webContents.send('update-progress', Math.round(progress.percent));
+  }
 });
 // Update downloaded event — moved outside to reflect better control flow
 autoUpdater.on('update-downloaded', () => {
@@ -559,6 +562,23 @@ ipcMain.on('exit-bypass', () => {
     sessionPanel = null;
   }
   createLoginWindow();
+});
+
+// Manual update check support: allow renderer to trigger update check
+ipcMain.on('manual-update-check', () => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    autoUpdater.checkForUpdates();
+  }
+});
+
+ipcMain.handle('check-update-available', async () => {
+  try {
+    const result = await autoUpdater.checkForUpdates();
+    return !!result?.updateInfo && result.updateInfo.version !== app.getVersion();
+  } catch (err) {
+    console.error('Update check failed:', err);
+    return false;
+  }
 });
 
 ipcMain.on('app-exit', () => {
