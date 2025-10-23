@@ -21,7 +21,7 @@ autoUpdater.requestHeaders = { "Cache-Control": "no-cache" };
 
 autoUpdater.setFeedURL({
   provider: 'generic',
-  url: 'https://openrequest-secure-desktop.s3.us-east-1.amazonaws.com/updates/' 
+  url: 'https://openrequest-secure-desktop.s3.us-east-1.amazonaws.com/updates/'
 });
 
 // Update events
@@ -68,6 +68,7 @@ let sessionPanel;
 let reservationWindow;
 let lastUsername = 'User';
 let loginWatcherInterval = null;
+let focusMonitorInterval = null;
 
 function getInstrumentConfigPath() {
   return path.join(app.getPath('userData'), 'instrument-config.json');
@@ -99,9 +100,9 @@ function loadInstrumentConfig() {
 
 function startHeartbeat(instrumentUuid) {
   const intervalMs = 300_000; // 5 minutes
-  const platform   = os.platform();
-  const release    = os.release();
-  const hostname   = os.hostname();
+  const platform = os.platform();
+  const release = os.release();
+  const hostname = os.hostname();
   const appVersion = app.getVersion();
 
   const sendHeartbeat = async () => {
@@ -114,8 +115,8 @@ function startHeartbeat(instrumentUuid) {
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            timestamp:   new Date().toISOString(),
-            os:          { platform, release, hostname },
+            timestamp: new Date().toISOString(),
+            os: { platform, release, hostname },
             app_version: appVersion
           })
         }
@@ -192,13 +193,13 @@ function createLoginWindow() {
   }
 
   const instrumentUuid = loadInstrumentUuid();
- 
+
   if (!instrumentUuid) {
     // No UUID yet, show a normal small setup window
     mainWindow = new BrowserWindow({
       width: 1080,
       height: 800,
-      backgroundColor: '#111827', 
+      backgroundColor: '#111827',
       resizable: false,
       fullscreenable: false,
       frame: false,
@@ -215,13 +216,19 @@ function createLoginWindow() {
   } else {
     startHeartbeat(loadInstrumentUuid());
     // UUID is present, launch into full kiosk mode
+    const { width, height } = screen.getPrimaryDisplay().bounds;
+
     mainWindow = new BrowserWindow({
-      fullscreen: true,
+      width: width,
+      height: height,
+      x: 0,
+      y: 0,
       frame: false,
-      kiosk: true,
+      kiosk: process.platform !== 'darwin', // kiosk mode only on Windows/Linux
       backgroundColor: '#111827', // <-- Tailwind "gray-900"
       alwaysOnTop: true,
       resizable: false,
+      fullscreenable: false, // prevent F11 fullscreen
       autoHideMenuBar: true,    // Windows/Linux: hides the Alt-menu bar
       skipTaskbar: true,        // hides from Windows taskbar / Linux dock
       webPreferences: {
@@ -231,11 +238,33 @@ function createLoginWindow() {
       }
     });
 
+    // On macOS, use simpleFullScreen to cover menu bar and dock
+    if (process.platform === 'darwin') {
+      mainWindow.setSimpleFullScreen(true);
+    }
+
     mainWindow.loadURL(`https://openrequest.jh.edu/desktop-welcome?instrument_uuid=${instrumentUuid}`);
     mainWindow.webContents.once('did-finish-load', () => {
       if (loginWatcherInterval) {
         clearInterval(loginWatcherInterval);
       }
+
+      // Start focus monitor to prevent app switching
+      if (focusMonitorInterval) {
+        clearInterval(focusMonitorInterval);
+      }
+
+      focusMonitorInterval = setInterval(() => {
+        if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isFocused()) {
+          console.log('🔒 Window lost focus — refocusing');
+          mainWindow.show();
+          mainWindow.focus();
+          mainWindow.moveTop();
+          if (process.platform === 'darwin') {
+            app.focus({ steal: true });
+          }
+        }
+      }, 500); // Check every 500ms
 
       // Removed update check on load to prevent update checks on app launch
 
@@ -278,7 +307,7 @@ function createSessionPanel(token, username, sessionId, endTime) {
     y: 0,
     backgroundColor: '#111827', // <-- Tailwind "gray-900"
     fullscreen: false,
-    frame: false, 
+    frame: false,
     alwaysOnTop: true,
     resizable: false,
     autoHideMenuBar: true,    // Windows/Linux: hides the Alt-menu bar
@@ -300,14 +329,19 @@ function createSessionPanel(token, username, sessionId, endTime) {
 
 function createReservationWindow(token, username) {
   const instrumentUuid = loadInstrumentUuid();
+  const { width, height } = screen.getPrimaryDisplay().bounds;
 
   reservationWindow = new BrowserWindow({
+    width: width,
+    height: height,
+    x: 0,
+    y: 0,
     backgroundColor: '#111827', // <-- Tailwind "gray-900"
-    fullscreen: true,
     frame: false,
-    kiosk: true,
+    kiosk: process.platform !== 'darwin', // kiosk mode only on Windows/Linux
     alwaysOnTop: true,
     resizable: false,
+    fullscreenable: false,
     autoHideMenuBar: true,    // Windows/Linux: hides the Alt-menu bar
     skipTaskbar: true,        // hides from Windows taskbar / Linux dock
     webPreferences: {
@@ -317,10 +351,14 @@ function createReservationWindow(token, username) {
     }
   });
 
+  // On macOS, use simpleFullScreen to cover menu bar and dock
+  if (process.platform === 'darwin') {
+    reservationWindow.setSimpleFullScreen(true);
+  }
+
   reservationWindow.loadFile('renderer/reservation.html');
 
   reservationWindow.webContents.once('did-finish-load', () => {
-    reservationWindow.setFullScreen(true); // ensure fullscreen on Mac after load
     reservationWindow.webContents.send('reservation-data', {
       token,
       username,
@@ -397,17 +435,17 @@ ipcMain.on('token-received', (event, msg) => {
     const jsonString = msg.substring('save-instrument:'.length); // slice after "save-instrument:"
     const config = JSON.parse(jsonString);
     saveInstrumentConfig(config);
-      // Properly restart app into fullscreen mode
-      if (mainWindow) {
-        mainWindow.allowClose = true;
-        mainWindow.close();
-        mainWindow.destroy();
-        mainWindow = null;
-      }
+    // Properly restart app into fullscreen mode
+    if (mainWindow) {
+      mainWindow.allowClose = true;
+      mainWindow.close();
+      mainWindow.destroy();
+      mainWindow = null;
+    }
     createLoginWindow();
   } else {
     const { token, username } = JSON.parse(msg);
-    lastUsername = username; 
+    lastUsername = username;
     if (mainWindow) {
       mainWindow.allowClose = true;
       mainWindow.close();
@@ -503,9 +541,9 @@ app.whenReady().then(async () => {
     const autostartPath = path.join(os.homedir(), '.config', 'autostart');
     const autostartFile = path.join(autostartPath, 'openrequest.desktop');
     const appDesktopFile = path.join(process.resourcesPath, 'openrequest.desktop');
-  
+
     fs.mkdirSync(autostartPath, { recursive: true });
-  
+
     if (!fs.existsSync(autostartFile)) {
       fs.copyFile(appDesktopFile, autostartFile, err => {
         if (err) {
@@ -530,7 +568,7 @@ app.whenReady().then(async () => {
   }
 
   createLoginWindow();
-  
+
   scheduleSilentAutoUpdateCheck();
 
   powerMonitor.on('resume', () => {
@@ -595,7 +633,7 @@ app.on('browser-window-created', (_, window) => {
   window.setAutoHideMenuBar(true);
   window.allowClose = false;
 
-  window.on('close', (e) => {  
+  window.on('close', (e) => {
     if (!window.allowClose) {
       e.preventDefault(); // 🔒 prevent default close
     }
@@ -612,19 +650,29 @@ app.on('browser-window-created', (_, window) => {
   window.webContents.on('before-input-event', (event, input) => {
     const isMac = process.platform === 'darwin';
 
+    // Intercept Cmd+Tab on Mac to prevent app switching
+    if (isMac && input.meta && input.code === 'Tab') {
+      event.preventDefault();
+      console.log('🚫 Cmd+Tab blocked — refocusing window');
+      window.show();
+      window.focus();
+      window.moveTop();
+      return;
+    }
+
     const adminExit =
-    (isMac &&
-      input.meta &&
-      input.alt &&
-      input.code === 'KeyQ' &&
-      !input.control &&
-      !input.shift) ||
-    (!isMac &&
-      input.control &&
-      input.shift &&
-      input.code === 'KeyQ' &&
-      !input.meta &&
-      !input.alt);
+      (isMac &&
+        input.meta &&
+        input.alt &&
+        input.code === 'KeyQ' &&
+        !input.control &&
+        !input.shift) ||
+      (!isMac &&
+        input.control &&
+        input.shift &&
+        input.code === 'KeyQ' &&
+        !input.meta &&
+        !input.alt);
 
     if (adminExit) {
       console.log('🔐 Admin key combo triggered — exiting app.');
