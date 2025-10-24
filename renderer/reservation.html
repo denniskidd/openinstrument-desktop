@@ -99,10 +99,64 @@
       let token, instrumentUuid, reservationId;
       let upcoming;
 
-      function manualUpdate() {
-        if (confirm("Check for updates and install if available?")) {
-          window.electronAPI.sendManualUpdateCheck();
+      // Listen for update status changes
+      window.electronAPI.onUpdateStatus((status) => {
+        const updateStatus = document.getElementById('updateStatus');
+        const updateBtn = document.getElementById('updateBtn');
+        
+        console.log('Update status:', status);
+        
+        switch(status.status) {
+          case 'checking':
+            updateStatus.textContent = 'Checking for updates...';
+            updateStatus.classList.remove('hidden');
+            updateStatus.className = 'text-blue-400 text-lg mt-4';
+            updateBtn.disabled = true;
+            break;
+          case 'available':
+            updateStatus.textContent = `Update available: v${status.version}. Downloading...`;
+            updateStatus.classList.remove('hidden');
+            updateStatus.className = 'text-yellow-400 text-lg mt-4';
+            break;
+          case 'not-available':
+            updateStatus.textContent = 'You are on the latest version!';
+            updateStatus.classList.remove('hidden');
+            updateStatus.className = 'text-green-400 text-lg mt-4';
+            updateBtn.disabled = false;
+            setTimeout(() => {
+              updateStatus.classList.add('hidden');
+            }, 3000);
+            break;
+          case 'downloaded':
+            updateStatus.textContent = 'Update downloaded! Will install when app closes.';
+            updateStatus.classList.remove('hidden');
+            updateStatus.className = 'text-green-400 text-lg mt-4';
+            updateBtn.classList.add('hidden');
+            break;
+          case 'error':
+            updateStatus.textContent = `Update error: ${status.message || 'Unknown error'}`;
+            updateStatus.classList.remove('hidden');
+            updateStatus.className = 'text-red-400 text-lg mt-4';
+            updateBtn.disabled = false;
+            setTimeout(() => {
+              updateStatus.classList.add('hidden');
+            }, 5000);
+            break;
         }
+      });
+
+      // Listen for update progress
+      window.electronAPI.onUpdateProgress((progress) => {
+        const updateStatus = document.getElementById('updateStatus');
+        updateStatus.textContent = `Downloading update: ${progress}%`;
+        updateStatus.classList.remove('hidden');
+        updateStatus.className = 'text-yellow-400 text-lg mt-4';
+      });
+
+      function manualUpdate() {
+        const updateBtn = document.getElementById('updateBtn');
+        updateBtn.disabled = true;
+        window.electronAPI.sendManualUpdateCheck();
       }
 
       window.electronAPI.onReservationData(async (data) => {

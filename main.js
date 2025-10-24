@@ -27,22 +27,45 @@ autoUpdater.setFeedURL({
 // Update events
 autoUpdater.on('checking-for-update', () => {
   console.log('AutoUpdater: Checking for update...');
+  // Notify all windows
+  BrowserWindow.getAllWindows().forEach(win => {
+    if (win && !win.isDestroyed()) {
+      win.webContents.send('update-status', { status: 'checking' });
+    }
+  });
 });
 autoUpdater.on('update-available', info => {
   console.log('AutoUpdater: Update available:', info.version);
+  BrowserWindow.getAllWindows().forEach(win => {
+    if (win && !win.isDestroyed()) {
+      win.webContents.send('update-status', { status: 'available', version: info.version });
+    }
+  });
 });
 autoUpdater.on('update-not-available', () => {
   console.log('AutoUpdater: No updates found.');
+  BrowserWindow.getAllWindows().forEach(win => {
+    if (win && !win.isDestroyed()) {
+      win.webContents.send('update-status', { status: 'not-available' });
+    }
+  });
 });
 autoUpdater.on('download-progress', progress => {
   console.log(`AutoUpdater: Downloading ${Math.round(progress.percent)}%`);
-  if (mainWindow) {
-    mainWindow.webContents.send('update-progress', Math.round(progress.percent));
-  }
+  BrowserWindow.getAllWindows().forEach(win => {
+    if (win && !win.isDestroyed()) {
+      win.webContents.send('update-progress', Math.round(progress.percent));
+    }
+  });
 });
 // Update downloaded event — moved outside to reflect better control flow
 autoUpdater.on('update-downloaded', () => {
   console.log('AutoUpdater: Update downloaded — checking if safe to quit and install…');
+  BrowserWindow.getAllWindows().forEach(win => {
+    if (win && !win.isDestroyed()) {
+      win.webContents.send('update-status', { status: 'downloaded' });
+    }
+  });
 
   const currentUrl = mainWindow?.webContents?.getURL()?.toLowerCase() || '';
   const isIdle = (
@@ -61,6 +84,11 @@ autoUpdater.on('update-downloaded', () => {
 });
 autoUpdater.on('error', err => {
   console.error('AutoUpdater error:', err);
+  BrowserWindow.getAllWindows().forEach(win => {
+    if (win && !win.isDestroyed()) {
+      win.webContents.send('update-status', { status: 'error', message: err.message });
+    }
+  });
 });
 
 let mainWindow;
@@ -313,13 +341,14 @@ function createSessionPanel(token, username, sessionId, endTime) {
   const windowHeight = 84;
 
   const x = Math.floor((screenWidth - windowWidth) / 2);
-  const y = Math.floor((screenHeight - windowHeight) / 2);
+  // On macOS, position below menu bar (~30px); on other platforms, at top
+  const y = process.platform === 'darwin' ? 30 : 0;
 
   sessionPanel = new BrowserWindow({
     width: windowWidth,
     height: windowHeight,
     x: x,
-    y: 0,
+    y: y,
     backgroundColor: '#111827', // <-- Tailwind "gray-900"
     fullscreen: false,
     frame: false,
@@ -641,9 +670,22 @@ ipcMain.on('exit-bypass', () => {
 });
 
 // Manual update check support: allow renderer to trigger update check
-ipcMain.on('manual-update-check', () => {
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    autoUpdater.checkForUpdates();
+ipcMain.on('manual-update-check', async () => {
+  try {
+    console.log('Manual update check triggered');
+    BrowserWindow.getAllWindows().forEach(win => {
+      if (win && !win.isDestroyed()) {
+        win.webContents.send('update-status', { status: 'checking' });
+      }
+    });
+    await autoUpdater.checkForUpdates();
+  } catch (err) {
+    console.error('Manual update check failed:', err);
+    BrowserWindow.getAllWindows().forEach(win => {
+      if (win && !win.isDestroyed()) {
+        win.webContents.send('update-status', { status: 'error', message: err.message });
+      }
+    });
   }
 });
 

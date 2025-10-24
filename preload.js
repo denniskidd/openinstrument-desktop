@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   sendManualUpdateCheck: () => ipcRenderer.send('manual-update-check'),
   checkForUpdateAvailable: () => ipcRenderer.invoke('check-update-available'),
   onUpdateProgress: (callback) => ipcRenderer.on('update-progress', (event, progress) => callback(progress)),
+  onUpdateStatus: (callback) => ipcRenderer.on('update-status', (event, status) => callback(status)),
 });
 
 window.addEventListener('message', (event) => {
