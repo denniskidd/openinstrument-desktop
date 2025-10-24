@@ -9,10 +9,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onSessionInfo: (callback) => ipcRenderer.on('session-info', (event, data) => callback(data)),
   sendExitBypass: () => ipcRenderer.send('exit-bypass'),
   exitApp: () => ipcRenderer.send('app-exit'),
-  sendManualUpdateCheck: () => ipcRenderer.send('manual-update-check'),
-  checkForUpdateAvailable: () => ipcRenderer.invoke('check-update-available'),
-  onUpdateProgress: (callback) => ipcRenderer.on('update-progress', (event, progress) => callback(progress)),
-  onUpdateStatus: (callback) => ipcRenderer.on('update-status', (event, status) => callback(status)),
 });
 
 window.addEventListener('message', (event) => {

@@ -4,92 +4,10 @@ if (process.platform === 'linux') {
   app.commandLine.appendSwitch('gtk-version', '3');
 }
 
-const { autoUpdater } = require('electron-updater');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
-const log = require('electron-log');
-const { powerMonitor } = require('electron'); //for waking app from sleep
-
-autoUpdater.logger = log;
-autoUpdater.logger.transports.file.level = 'info';
-autoUpdater.allowDowngrade = false;
-autoUpdater.fullChangelog = false;
-autoUpdater.autoDownload = true;
-autoUpdater.autoInstallOnAppQuit = true;
-autoUpdater.requestHeaders = { "Cache-Control": "no-cache" };
-
-autoUpdater.setFeedURL({
-  provider: 'generic',
-  url: 'https://openrequest-secure-desktop.s3.us-east-1.amazonaws.com/updates/'
-});
-
-// Update events
-autoUpdater.on('checking-for-update', () => {
-  console.log('AutoUpdater: Checking for update...');
-  // Notify all windows
-  BrowserWindow.getAllWindows().forEach(win => {
-    if (win && !win.isDestroyed()) {
-      win.webContents.send('update-status', { status: 'checking' });
-    }
-  });
-});
-autoUpdater.on('update-available', info => {
-  console.log('AutoUpdater: Update available:', info.version);
-  BrowserWindow.getAllWindows().forEach(win => {
-    if (win && !win.isDestroyed()) {
-      win.webContents.send('update-status', { status: 'available', version: info.version });
-    }
-  });
-});
-autoUpdater.on('update-not-available', () => {
-  console.log('AutoUpdater: No updates found.');
-  BrowserWindow.getAllWindows().forEach(win => {
-    if (win && !win.isDestroyed()) {
-      win.webContents.send('update-status', { status: 'not-available' });
-    }
-  });
-});
-autoUpdater.on('download-progress', progress => {
-  console.log(`AutoUpdater: Downloading ${Math.round(progress.percent)}%`);
-  BrowserWindow.getAllWindows().forEach(win => {
-    if (win && !win.isDestroyed()) {
-      win.webContents.send('update-progress', Math.round(progress.percent));
-    }
-  });
-});
-// Update downloaded event — moved outside to reflect better control flow
-autoUpdater.on('update-downloaded', () => {
-  console.log('AutoUpdater: Update downloaded — checking if safe to quit and install…');
-  BrowserWindow.getAllWindows().forEach(win => {
-    if (win && !win.isDestroyed()) {
-      win.webContents.send('update-status', { status: 'downloaded' });
-    }
-  });
-
-  const currentUrl = mainWindow?.webContents?.getURL()?.toLowerCase() || '';
-  const isIdle = (
-    mainWindow &&
-    currentUrl.includes('desktop-welcome') &&
-    !sessionPanel &&
-    !reservationWindow
-  );
-
-  if (isIdle) {
-    console.log('✅ App is idle — quitting and installing update');
-    autoUpdater.quitAndInstall();
-  } else {
-    console.log('🛑 App is in use — skipping auto quit/install');
-  }
-});
-autoUpdater.on('error', err => {
-  console.error('AutoUpdater error:', err);
-  BrowserWindow.getAllWindows().forEach(win => {
-    if (win && !win.isDestroyed()) {
-      win.webContents.send('update-status', { status: 'error', message: err.message });
-    }
-  });
-});
+const { powerMonitor } = require('electron');
 
 let mainWindow;
 let sessionPanel;
@@ -156,43 +74,6 @@ function startHeartbeat(instrumentUuid) {
 
   sendHeartbeat(); // Send immediately on start
   setInterval(sendHeartbeat, intervalMs);
-}
-
-async function checkUpdateIfIdle() {
-  const instrumentUuid = loadInstrumentUuid();
-  if (
-    mainWindow &&
-    !sessionPanel &&
-    !reservationWindow &&
-    mainWindow.webContents &&
-    mainWindow.webContents.getURL().toLowerCase().includes('desktop-welcome')
-  ) {
-    try {
-      const res = await fetch(`https://openrequest.jh.edu/api/instruments/${instrumentUuid}`);
-      const data = await res.json();
-
-      if (data.can_update) {
-        console.log('🔄 Checking for update (allowed by server)');
-        await autoUpdater.checkForUpdates();
-      } else {
-        console.log('🚫 Skipping update — server says not allowed');
-      }
-    } catch (err) {
-      console.error('❌ Failed to fetch update permission:', err);
-    }
-  }
-}
-
-function scheduleSilentAutoUpdateCheck() {
-  const now = new Date();
-  const nextMidnight = new Date();
-  nextMidnight.setHours(24, 0, 0, 0);
-  const initialDelay = nextMidnight - now;
-
-  setTimeout(() => {
-    checkUpdateIfIdle();
-    setInterval(checkUpdateIfIdle, 24 * 60 * 60 * 1000); // Every 24h
-  }, initialDelay);
 }
 
 // Cleanup function for previous session
@@ -628,8 +509,6 @@ app.whenReady().then(async () => {
 
   createLoginWindow();
 
-  scheduleSilentAutoUpdateCheck();
-
   powerMonitor.on('resume', () => {
     if (mainWindow && !mainWindow.isDestroyed()) {
       console.log('💤 System resumed — reloading main window');
@@ -667,36 +546,6 @@ ipcMain.on('exit-bypass', () => {
     sessionPanel = null;
   }
   createLoginWindow();
-});
-
-// Manual update check support: allow renderer to trigger update check
-ipcMain.on('manual-update-check', async () => {
-  try {
-    console.log('Manual update check triggered');
-    BrowserWindow.getAllWindows().forEach(win => {
-      if (win && !win.isDestroyed()) {
-        win.webContents.send('update-status', { status: 'checking' });
-      }
-    });
-    await autoUpdater.checkForUpdates();
-  } catch (err) {
-    console.error('Manual update check failed:', err);
-    BrowserWindow.getAllWindows().forEach(win => {
-      if (win && !win.isDestroyed()) {
-        win.webContents.send('update-status', { status: 'error', message: err.message });
-      }
-    });
-  }
-});
-
-ipcMain.handle('check-update-available', async () => {
-  try {
-    const result = await autoUpdater.checkForUpdates();
-    return !!result?.updateInfo && result.updateInfo.version !== app.getVersion();
-  } catch (err) {
-    console.error('Update check failed:', err);
-    return false;
-  }
 });
 
 ipcMain.on('app-exit', () => {

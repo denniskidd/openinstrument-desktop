@@ -67,17 +67,6 @@
     </div>
 
     <div class="absolute bottom-8 right-12">
-      <div id="updateStatus" class="text-yellow-400 text-lg mt-4 hidden">
-        Downloading update...
-      </div>
-      <button
-        id="updateBtn"
-        onclick="manualUpdate()"
-        class="border border-yellow-400 text-white py-2 px-6 text-2xl rounded-full hover:bg-yellow-400 hover:text-gray-900 transition hidden mr-2"
-      >
-        Update App
-      </button>
-
       <button
         id="bypassButton"
         onclick="startBypass()"
@@ -99,66 +88,6 @@
       let token, instrumentUuid, reservationId;
       let upcoming;
 
-      // Listen for update status changes
-      window.electronAPI.onUpdateStatus((status) => {
-        const updateStatus = document.getElementById('updateStatus');
-        const updateBtn = document.getElementById('updateBtn');
-        
-        console.log('Update status:', status);
-        
-        switch(status.status) {
-          case 'checking':
-            updateStatus.textContent = 'Checking for updates...';
-            updateStatus.classList.remove('hidden');
-            updateStatus.className = 'text-blue-400 text-lg mt-4';
-            updateBtn.disabled = true;
-            break;
-          case 'available':
-            updateStatus.textContent = `Update available: v${status.version}. Downloading...`;
-            updateStatus.classList.remove('hidden');
-            updateStatus.className = 'text-yellow-400 text-lg mt-4';
-            break;
-          case 'not-available':
-            updateStatus.textContent = 'You are on the latest version!';
-            updateStatus.classList.remove('hidden');
-            updateStatus.className = 'text-green-400 text-lg mt-4';
-            updateBtn.disabled = false;
-            setTimeout(() => {
-              updateStatus.classList.add('hidden');
-            }, 3000);
-            break;
-          case 'downloaded':
-            updateStatus.textContent = 'Update downloaded! Will install when app closes.';
-            updateStatus.classList.remove('hidden');
-            updateStatus.className = 'text-green-400 text-lg mt-4';
-            updateBtn.classList.add('hidden');
-            break;
-          case 'error':
-            updateStatus.textContent = `Update error: ${status.message || 'Unknown error'}`;
-            updateStatus.classList.remove('hidden');
-            updateStatus.className = 'text-red-400 text-lg mt-4';
-            updateBtn.disabled = false;
-            setTimeout(() => {
-              updateStatus.classList.add('hidden');
-            }, 5000);
-            break;
-        }
-      });
-
-      // Listen for update progress
-      window.electronAPI.onUpdateProgress((progress) => {
-        const updateStatus = document.getElementById('updateStatus');
-        updateStatus.textContent = `Downloading update: ${progress}%`;
-        updateStatus.classList.remove('hidden');
-        updateStatus.className = 'text-yellow-400 text-lg mt-4';
-      });
-
-      function manualUpdate() {
-        const updateBtn = document.getElementById('updateBtn');
-        updateBtn.disabled = true;
-        window.electronAPI.sendManualUpdateCheck();
-      }
-
       window.electronAPI.onReservationData(async (data) => {
         token = data.token;
         instrumentUuid = data.instrumentUuid;
@@ -168,12 +97,6 @@
         const welcome = document.getElementById("welcome");
 
         document.getElementById("cancelBtn").classList.remove("hidden");
-
-        const updateBtn = document.getElementById("updateBtn");
-        const hasUpdate = await window.electronAPI.checkForUpdateAvailable();
-        if (hasUpdate) {
-          updateBtn.classList.remove("hidden");
-        }
 
         const res = await fetch(
           `https://openrequest.jh.edu/api/reservations?instrument_uuid=${instrumentUuid}`,
@@ -217,12 +140,6 @@
 
         //check admin status
         await checkAdminStatus();
-      });
-
-      window.electronAPI.onUpdateProgress((percent) => {
-        const status = document.getElementById("updateStatus");
-        status.classList.remove("hidden");
-        status.textContent = `Downloading update... ${percent}%`;
       });
 
       async function checkAdminStatus() {
