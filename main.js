@@ -216,31 +216,46 @@ function createLoginWindow() {
   } else {
     startHeartbeat(loadInstrumentUuid());
     // UUID is present, launch into full kiosk mode
-    const { width, height } = screen.getPrimaryDisplay().bounds;
 
-    mainWindow = new BrowserWindow({
-      width: width,
-      height: height,
-      x: 0,
-      y: 0,
-      frame: false,
-      kiosk: process.platform !== 'darwin', // kiosk mode only on Windows/Linux
-      backgroundColor: '#111827', // <-- Tailwind "gray-900"
-      alwaysOnTop: true,
-      resizable: false,
-      fullscreenable: false, // prevent F11 fullscreen
-      autoHideMenuBar: true,    // Windows/Linux: hides the Alt-menu bar
-      skipTaskbar: true,        // hides from Windows taskbar / Linux dock
-      webPreferences: {
-        preload: path.join(__dirname, 'preload.js'),
-        contextIsolation: true,
-        nodeIntegration: false,
-      }
-    });
-
-    // On macOS, use simpleFullScreen to cover menu bar and dock
     if (process.platform === 'darwin') {
+      // macOS: use maximized window with simpleFullScreen to avoid separate Space
+      const { width, height } = screen.getPrimaryDisplay().bounds;
+      mainWindow = new BrowserWindow({
+        width: width,
+        height: height,
+        x: 0,
+        y: 0,
+        frame: false,
+        backgroundColor: '#111827',
+        alwaysOnTop: true,
+        resizable: false,
+        fullscreenable: false,
+        autoHideMenuBar: true,
+        skipTaskbar: true,
+        webPreferences: {
+          preload: path.join(__dirname, 'preload.js'),
+          contextIsolation: true,
+          nodeIntegration: false,
+        }
+      });
       mainWindow.setSimpleFullScreen(true);
+    } else {
+      // Windows/Linux: use traditional fullscreen + kiosk mode
+      mainWindow = new BrowserWindow({
+        fullscreen: true,
+        frame: false,
+        kiosk: true,
+        backgroundColor: '#111827',
+        alwaysOnTop: true,
+        resizable: false,
+        autoHideMenuBar: true,
+        skipTaskbar: true,
+        webPreferences: {
+          preload: path.join(__dirname, 'preload.js'),
+          contextIsolation: true,
+          nodeIntegration: false,
+        }
+      });
     }
 
     mainWindow.loadURL(`https://openrequest.jh.edu/desktop-welcome?instrument_uuid=${instrumentUuid}`);
@@ -329,31 +344,46 @@ function createSessionPanel(token, username, sessionId, endTime) {
 
 function createReservationWindow(token, username) {
   const instrumentUuid = loadInstrumentUuid();
-  const { width, height } = screen.getPrimaryDisplay().bounds;
 
-  reservationWindow = new BrowserWindow({
-    width: width,
-    height: height,
-    x: 0,
-    y: 0,
-    backgroundColor: '#111827', // <-- Tailwind "gray-900"
-    frame: false,
-    kiosk: process.platform !== 'darwin', // kiosk mode only on Windows/Linux
-    alwaysOnTop: true,
-    resizable: false,
-    fullscreenable: false,
-    autoHideMenuBar: true,    // Windows/Linux: hides the Alt-menu bar
-    skipTaskbar: true,        // hides from Windows taskbar / Linux dock
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
-      contextIsolation: true,
-      nodeIntegration: false
-    }
-  });
-
-  // On macOS, use simpleFullScreen to cover menu bar and dock
   if (process.platform === 'darwin') {
+    // macOS: use maximized window with simpleFullScreen to avoid separate Space
+    const { width, height } = screen.getPrimaryDisplay().bounds;
+    reservationWindow = new BrowserWindow({
+      width: width,
+      height: height,
+      x: 0,
+      y: 0,
+      backgroundColor: '#111827',
+      frame: false,
+      alwaysOnTop: true,
+      resizable: false,
+      fullscreenable: false,
+      autoHideMenuBar: true,
+      skipTaskbar: true,
+      webPreferences: {
+        preload: path.join(__dirname, 'preload.js'),
+        contextIsolation: true,
+        nodeIntegration: false
+      }
+    });
     reservationWindow.setSimpleFullScreen(true);
+  } else {
+    // Windows/Linux: use traditional fullscreen + kiosk mode
+    reservationWindow = new BrowserWindow({
+      fullscreen: true,
+      frame: false,
+      kiosk: true,
+      backgroundColor: '#111827',
+      alwaysOnTop: true,
+      resizable: false,
+      autoHideMenuBar: true,
+      skipTaskbar: true,
+      webPreferences: {
+        preload: path.join(__dirname, 'preload.js'),
+        contextIsolation: true,
+        nodeIntegration: false
+      }
+    });
   }
 
   reservationWindow.loadFile('renderer/reservation.html');
@@ -577,7 +607,11 @@ app.whenReady().then(async () => {
       mainWindow.reload();
       mainWindow.show();
       mainWindow.focus();
-      mainWindow.setKiosk(true);
+      if (process.platform === 'darwin') {
+        mainWindow.setSimpleFullScreen(true);
+      } else {
+        mainWindow.setKiosk(true);
+      }
     }
   });
 
@@ -587,7 +621,11 @@ app.whenReady().then(async () => {
       mainWindow.reload();
       mainWindow.show();
       mainWindow.focus();
-      mainWindow.setKiosk(true);
+      if (process.platform === 'darwin') {
+        mainWindow.setSimpleFullScreen(true);
+      } else {
+        mainWindow.setKiosk(true);
+      }
     }
   });
 });
