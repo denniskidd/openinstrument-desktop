@@ -314,13 +314,14 @@ function createBypassPanel(token) {
   const windowHeight = 84;
 
   const x = Math.floor((screenWidth - windowWidth) / 2);
-  const y = Math.floor((screenHeight - windowHeight) / 2);
+  // On macOS, position below menu bar (~30px); on other platforms, at top
+  const y = process.platform === 'darwin' ? 30 : 0;
 
   sessionPanel = new BrowserWindow({
     width: windowWidth,
     height: windowHeight,
     x: x,
-    y: 0,
+    y: y,
     frame: false,
     transparent: false,
     resizable: false,
