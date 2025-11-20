@@ -1,7 +1,7 @@
 {
-  "name": "openrequest-electron",
-  "productName": "OpenRequest Secure Desktop",
-  "version": "2.0.1",
+  "name": "openrequest-desktop",
+  "productName": "OpenRequest Desktop",
+  "version": "2.0.2",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -21,7 +21,7 @@
   },
   "build": {
     "appId": "edu.jh.openrequest",
-    "productName": "OpenRequest Secure Desktop",
+    "productName": "OpenRequest Desktop",
     "afterSign": "build/notarize.js",
     "mac": {
       "target": [

@@ -122,6 +122,17 @@ function createLoginWindow() {
     });
 
     mainWindow.loadFile('renderer/login.html');
+
+    // Add crash detection and recovery
+    mainWindow.webContents.on('render-process-gone', (event, details) => {
+      console.error('Renderer process crashed:', details);
+      mainWindow.reload();
+    });
+
+    mainWindow.webContents.on('unresponsive', () => {
+      console.error('Window became unresponsive');
+      mainWindow.reload();
+    });
   } else {
     startHeartbeat(loadInstrumentUuid());
     // UUID is present, launch into full kiosk mode
@@ -168,6 +179,29 @@ function createLoginWindow() {
     }
 
     mainWindow.loadURL(`https://openrequest.jh.edu/desktop-welcome?instrument_uuid=${instrumentUuid}`);
+
+    // Add crash detection and recovery
+    mainWindow.webContents.on('render-process-gone', (event, details) => {
+      console.error('Renderer process crashed:', details);
+      mainWindow.reload();
+    });
+
+    mainWindow.webContents.on('unresponsive', () => {
+      console.error('Window became unresponsive');
+      mainWindow.reload();
+    });
+
+    // Health check every 5 minutes to detect black screen issues
+    setInterval(() => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.executeJavaScript('document.readyState')
+          .catch(err => {
+            console.error('Health check failed, reloading window:', err);
+            mainWindow.reload();
+          });
+      }
+    }, 300000); // 5 minutes
+
     mainWindow.webContents.once('did-finish-load', () => {
       if (loginWatcherInterval) {
         clearInterval(loginWatcherInterval);
