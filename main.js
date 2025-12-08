@@ -178,7 +178,21 @@ function createLoginWindow() {
       });
     }
 
-    mainWindow.loadURL(`https://openrequest.jh.edu/desktop-welcome?instrument_uuid=${instrumentUuid}`);
+    const welcomeUrl = `https://openrequest.jh.edu/desktop-welcome?instrument_uuid=${instrumentUuid}`;
+    mainWindow.loadURL(welcomeUrl);
+
+    // Handle network failures by retrying
+    mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL, isMainFrame) => {
+      // -3 is ERR_ABORTED, usually harmless (e.g. new navigation started)
+      if (isMainFrame && errorCode !== -3) {
+        console.log(`Page failed to load (${errorCode}: ${errorDescription}). Retrying in 10s...`);
+        setTimeout(() => {
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.loadURL(welcomeUrl);
+          }
+        }, 10000);
+      }
+    });
 
     // Add crash detection and recovery
     mainWindow.webContents.on('render-process-gone', (event, details) => {
@@ -507,71 +521,86 @@ ipcMain.on('start-bypass', async (event, { token }) => {
   createBypassPanel(token);
 });
 
-app.whenReady().then(async () => {
-  app.setLoginItemSettings({
-    openAtLogin: true,
-    path: app.getPath('exe')
+const gotTheLock = app.requestSingleInstanceLock();
+
+if (!gotTheLock) {
+  app.quit();
+} else {
+  app.on('second-instance', (event, commandLine, workingDirectory) => {
+    // Someone tried to run a second instance, we should focus our window.
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+      mainWindow.show();
+    }
   });
-  if (process.platform === 'linux') {
-    const autostartPath = path.join(os.homedir(), '.config', 'autostart');
-    const autostartFile = path.join(autostartPath, 'openrequest.desktop');
-    const appDesktopFile = path.join(process.resourcesPath, 'openrequest.desktop');
 
-    fs.mkdirSync(autostartPath, { recursive: true });
+  app.whenReady().then(async () => {
+    app.setLoginItemSettings({
+      openAtLogin: true,
+      path: app.getPath('exe')
+    });
+    if (process.platform === 'linux') {
+      const autostartPath = path.join(os.homedir(), '.config', 'autostart');
+      const autostartFile = path.join(autostartPath, 'openrequest.desktop');
+      const appDesktopFile = path.join(process.resourcesPath, 'openrequest.desktop');
 
-    if (!fs.existsSync(autostartFile)) {
-      fs.copyFile(appDesktopFile, autostartFile, err => {
-        if (err) {
-          console.error('Failed to copy autostart .desktop file:', err);
+      fs.mkdirSync(autostartPath, { recursive: true });
+
+      if (!fs.existsSync(autostartFile)) {
+        fs.copyFile(appDesktopFile, autostartFile, err => {
+          if (err) {
+            console.error('Failed to copy autostart .desktop file:', err);
+          } else {
+            console.log('✅ Autostart .desktop file installed.');
+          }
+        });
+      }
+    }
+
+    const { powerSaveBlocker } = require('electron');
+    const blockerId = powerSaveBlocker.start('prevent-display-sleep')
+
+    if (process.platform === 'darwin') {
+      app.dock.hide();
+    }
+    Menu.setApplicationMenu(null);
+    const instUuid = loadInstrumentUuid();
+    if (instUuid) {
+      await cleanupPreviousSession(instUuid);
+    }
+
+    createLoginWindow();
+
+    powerMonitor.on('resume', () => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        console.log('💤 System resumed — reloading main window');
+        mainWindow.reload();
+        mainWindow.show();
+        mainWindow.focus();
+        if (process.platform === 'darwin') {
+          mainWindow.setSimpleFullScreen(true);
         } else {
-          console.log('✅ Autostart .desktop file installed.');
+          mainWindow.setKiosk(true);
         }
-      });
-    }
-  }
-
-  const { powerSaveBlocker } = require('electron');
-  const blockerId = powerSaveBlocker.start('prevent-display-sleep')
-
-  if (process.platform === 'darwin') {
-    app.dock.hide();
-  }
-  Menu.setApplicationMenu(null);
-  const instUuid = loadInstrumentUuid();
-  if (instUuid) {
-    await cleanupPreviousSession(instUuid);
-  }
-
-  createLoginWindow();
-
-  powerMonitor.on('resume', () => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      console.log('💤 System resumed — reloading main window');
-      mainWindow.reload();
-      mainWindow.show();
-      mainWindow.focus();
-      if (process.platform === 'darwin') {
-        mainWindow.setSimpleFullScreen(true);
-      } else {
-        mainWindow.setKiosk(true);
       }
-    }
-  });
+    });
 
-  powerMonitor.on('unlock-screen', () => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      console.log('🔓 Screen unlocked — reloading window');
-      mainWindow.reload();
-      mainWindow.show();
-      mainWindow.focus();
-      if (process.platform === 'darwin') {
-        mainWindow.setSimpleFullScreen(true);
-      } else {
-        mainWindow.setKiosk(true);
+    powerMonitor.on('unlock-screen', () => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        console.log('🔓 Screen unlocked — reloading window');
+        mainWindow.reload();
+        mainWindow.show();
+        mainWindow.focus();
+        if (process.platform === 'darwin') {
+          mainWindow.setSimpleFullScreen(true);
+        } else {
+          mainWindow.setKiosk(true);
+        }
       }
-    }
+    });
   });
-});
+}
 
 ipcMain.on('exit-bypass', () => {
   if (sessionPanel) {
