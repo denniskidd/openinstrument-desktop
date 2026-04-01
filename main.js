@@ -15,6 +15,7 @@ let reservationWindow;
 let lastUsername = 'User';
 let loginWatcherInterval = null;
 let focusMonitorInterval = null;
+let heartbeatInterval = null;
 
 function getInstrumentConfigPath() {
   return path.join(app.getPath('userData'), 'instrument-config.json');
@@ -72,8 +73,11 @@ function startHeartbeat(instrumentUuid) {
     }
   };
 
+  if (heartbeatInterval) {
+    clearInterval(heartbeatInterval);
+  }
   sendHeartbeat(); // Send immediately on start
-  setInterval(sendHeartbeat, intervalMs);
+  heartbeatInterval = setInterval(sendHeartbeat, intervalMs);
 }
 
 // Cleanup function for previous session
