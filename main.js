@@ -16,6 +16,7 @@ let lastUsername = 'User';
 let loginWatcherInterval = null;
 let focusMonitorInterval = null;
 let heartbeatInterval = null;
+let secondaryLockWindows = [];
 
 function getInstrumentConfigPath() {
   return path.join(app.getPath('userData'), 'instrument-config.json');
@@ -97,7 +98,47 @@ async function cleanupPreviousSession(uuid) {
   }
 }
 
+function createSecondaryLockWindows() {
+  const displays = screen.getAllDisplays();
+  const primaryDisplay = screen.getPrimaryDisplay();
+
+  displays.forEach(display => {
+    if (display.id === primaryDisplay.id) return;
+
+    const { x, y, width, height } = display.bounds;
+    const lockWin = new BrowserWindow({
+      x, y, width, height,
+      frame: false,
+      resizable: false,
+      movable: false,
+      alwaysOnTop: true,
+      skipTaskbar: true,
+      focusable: false,
+      backgroundColor: '#000000',
+      webPreferences: {
+        contextIsolation: true,
+        nodeIntegration: false,
+      }
+    });
+    lockWin.loadURL('data:text/html,<style>html,body{margin:0;padding:0;background:black;width:100%;height:100%}</style>');
+    secondaryLockWindows.push(lockWin);
+  });
+}
+
+function clearSecondaryLockWindows() {
+  secondaryLockWindows.forEach(win => {
+    if (win && !win.isDestroyed()) {
+      win.allowClose = true;
+      win.close();
+      win.destroy();
+    }
+  });
+  secondaryLockWindows = [];
+}
+
 function createLoginWindow() {
+  clearSecondaryLockWindows();
+
   if (mainWindow) {
     mainWindow.allowClose = true;
     mainWindow.close();
@@ -184,6 +225,7 @@ function createLoginWindow() {
 
     const welcomeUrl = `https://openrequest.jh.edu/desktop-welcome?instrument_uuid=${instrumentUuid}`;
     mainWindow.loadURL(welcomeUrl);
+    createSecondaryLockWindows();
 
     // Handle network failures by retrying
     mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL, isMainFrame) => {
@@ -360,6 +402,8 @@ function createReservationWindow(token, username) {
 }
 
 function createBypassPanel(token) {
+  clearSecondaryLockWindows();
+
   const { width: screenWidth, height: screenHeight } = screen.getPrimaryDisplay().workAreaSize;
 
   const windowWidth = 1080;
@@ -469,6 +513,7 @@ ipcMain.on('start-session', async (event, { token, reservationId, endTime }) => 
       reservationWindow.destroy();
       reservationWindow = null;
     }
+    clearSecondaryLockWindows();
     createSessionPanel(token, lastUsername, sessionId, endTime);
 
   } catch (err) {
@@ -679,6 +724,38 @@ app.on('browser-window-created', (_, window) => {
         win.destroy();
       });
       app.quit();
+    }
+
+    const adminBypass =
+      (isMac &&
+        input.meta &&
+        input.alt &&
+        input.code === 'KeyB' &&
+        !input.control &&
+        !input.shift) ||
+      (!isMac &&
+        input.control &&
+        input.shift &&
+        input.code === 'KeyB' &&
+        !input.meta &&
+        !input.alt);
+
+    if (adminBypass) {
+      console.log('🔐 Admin bypass combo triggered — entering bypass mode.');
+      if (loginWatcherInterval) {
+        clearInterval(loginWatcherInterval);
+        loginWatcherInterval = null;
+      }
+      BrowserWindow.getAllWindows().forEach(win => {
+        win.allowClose = true;
+        win.close();
+        win.destroy();
+      });
+      mainWindow = null;
+      reservationWindow = null;
+      session.defaultSession.clearStorageData({ storages: ['cookies'] }).then(() => {
+        createBypassPanel(null);
+      });
     }
   });
 });
