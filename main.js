@@ -56,7 +56,7 @@ function startHeartbeat(instrumentUuid) {
   const sendHeartbeat = async () => {
     try {
       await fetch(
-        `https://openrequest.jh.edu/api/instruments/${instrumentUuid}/heartbeat`,
+        `https://openinstrument.com/api/instruments/${instrumentUuid}/heartbeat`,
         {
           method: 'POST',
           headers: {
@@ -84,7 +84,7 @@ function startHeartbeat(instrumentUuid) {
 // Cleanup function for previous session
 async function cleanupPreviousSession(uuid) {
   try {
-    await fetch('https://openrequest.jh.edu/api/sessions/cleanup', {
+    await fetch('https://openinstrument.com/api/sessions/cleanup', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -223,7 +223,7 @@ function createLoginWindow() {
       });
     }
 
-    const welcomeUrl = `https://openrequest.jh.edu/desktop-welcome?instrument_uuid=${instrumentUuid}`;
+    const welcomeUrl = `https://openinstrument.com/desktop-welcome?instrument_uuid=${instrumentUuid}`;
     mainWindow.loadURL(welcomeUrl);
     createSecondaryLockWindows();
 
@@ -495,7 +495,7 @@ ipcMain.on('token-received', (event, msg) => {
 
 ipcMain.on('start-session', async (event, { token, reservationId, endTime }) => {
   try {
-    const response = await fetch('https://openrequest.jh.edu/api/sessions/start', {
+    const response = await fetch('https://openinstrument.com/api/sessions/start', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
@@ -523,7 +523,7 @@ ipcMain.on('start-session', async (event, { token, reservationId, endTime }) => 
 
 ipcMain.on('end-session', async (event, { token, sessionId }) => {
   try {
-    await fetch('https://openrequest.jh.edu/api/sessions/stop', {
+    await fetch('https://openinstrument.com/api/sessions/stop', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -591,8 +591,8 @@ if (!gotTheLock) {
     });
     if (process.platform === 'linux') {
       const autostartPath = path.join(os.homedir(), '.config', 'autostart');
-      const autostartFile = path.join(autostartPath, 'openrequest.desktop');
-      const appDesktopFile = path.join(process.resourcesPath, 'openrequest.desktop');
+      const autostartFile = path.join(autostartPath, 'openinstrument.desktop');
+      const appDesktopFile = path.join(process.resourcesPath, 'openinstrument.desktop');
 
       fs.mkdirSync(autostartPath, { recursive: true });
 

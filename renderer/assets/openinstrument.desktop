@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=OpenInstrument Desktop
+Exec=env GTK_PATH=/usr/lib64/gtk-3.0 /opt/OpenInstrument/OpenInstrument
+Icon=openinstrument
+X-GNOME-Autostart-enabled=true
+NoDisplay=false
+Terminal=false
+Categories=Utility;

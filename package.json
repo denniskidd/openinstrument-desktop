@@ -1,7 +1,7 @@
 {
-  "name": "openrequest-desktop",
-  "productName": "OpenRequest Desktop",
-  "version": "2026.4.10",
+  "name": "openinstrument-desktop",
+  "productName": "OpenInstrument Desktop",
+  "version": "2026.4.10b",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -13,15 +13,15 @@
     "email": "dennis.kidd@gmail.com"
   },
   "license": "ISC",
-  "description": "The OpenRequest desktop app for managing lab reservations",
+  "description": "The OpenInstrument desktop app for managing lab instruments.",
   "devDependencies": {
     "electron": "^36.0.0",
     "electron-builder": "^26.0.12",
     "electron-notarize": "^1.2.2"
   },
   "build": {
-    "appId": "edu.jh.openrequest",
-    "productName": "OpenRequest Desktop",
+    "appId": "com.openinstrument",
+    "productName": "OpenInstrument Desktop",
     "afterSign": "build/notarize.js",
     "mac": {
       "target": [
@@ -36,8 +36,8 @@
     },
     "extraResources": [
       {
-        "from": "assets/openrequest.desktop",
-        "to": "openrequest.desktop"
+        "from": "assets/openinstrument.desktop",
+        "to": "openinstrument.desktop"
       }
     ],
     "publish": [
