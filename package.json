@@ -42,9 +42,7 @@
     ],
     "publish": [
       {
-        "provider": "github",
-        "owner": "denniskidd",
-        "repo": "openrequest-electron"
+        "provider": "github"
       }
     ],
     "directories": {
