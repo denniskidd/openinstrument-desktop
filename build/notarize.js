@@ -13,7 +13,7 @@ exports.default = async function notarizeApp(context) {
     appBundleId: 'edu.jh.openrequest',
     appPath: `${appOutDir}/${appName}.app`,
     appleId: process.env.APPLE_ID,
-    appleIdPassword: process.env.APPLE_ID_PASS,
+    appleIdPassword: process.env.APPLE_APP_SPECIFIC_PASSWORD,
     tool: 'notarytool',
     teamId: process.env.APPLE_TEAM_ID, // <- must be added to your GitHub Secrets
   });
