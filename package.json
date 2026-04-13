@@ -31,6 +31,7 @@
         "zip",
         "dmg"
       ],
+      "icon": "assets/icons/mac/icon.icns",
       "hardenedRuntime": true,
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.plist",
@@ -64,7 +65,8 @@
         "rpm",
         "deb"
       ],
-      "category": "Utility"
+      "category": "Utility",
+      "icon": "assets/icons/png"
     },
     "win": {
       "target": [
@@ -76,7 +78,7 @@
           ]
         }
       ],
-      "icon": "assets/icon.ico"
+      "icon": "assets/icons/win/icon.ico"
     }
   }
 }
