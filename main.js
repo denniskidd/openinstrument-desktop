@@ -1,4 +1,5 @@
 const { app, BrowserWindow, ipcMain, session, Menu, screen } = require('electron');
+const { autoUpdater } = require('electron-updater');
 
 if (process.platform === 'linux') {
   app.commandLine.appendSwitch('gtk-version', '3');
@@ -18,6 +19,53 @@ let secondaryLockWindows = [];
 let storedToken = null;
 let confirmWindow = null;
 let pendingStopPayload = null;
+let updateDownloaded = false;
+
+// ── Auto-updater ─────────────────────────────────────────────────────────────
+// Load the GitHub token from a gitignored config file (never committed to source)
+const updaterConfigPath = app.isPackaged
+  ? path.join(process.resourcesPath, 'updater-config.json')
+  : path.join(__dirname, 'updater-config.json');
+
+let updaterToken = null;
+try {
+  updaterToken = JSON.parse(fs.readFileSync(updaterConfigPath, 'utf8')).token;
+} catch {
+  console.warn('updater-config.json not found — update checks will be skipped');
+}
+
+if (updaterToken) {
+  autoUpdater.setFeedURL({
+    provider: 'github',
+    owner: 'denniskidd',
+    repo: 'openinstrument-desktop',
+    private: true,
+    token: updaterToken
+  });
+}
+autoUpdater.autoDownload = true;
+autoUpdater.autoInstallOnAppQuit = false; // we control install timing
+
+autoUpdater.on('update-downloaded', () => {
+  updateDownloaded = true;
+  console.log('✅ Update downloaded — will install at next session end or idle');
+
+  // Already idle at login screen — schedule install after 60s buffer
+  // (re-check at callback time in case a session started during the wait)
+  if (!sessionPanel) {
+    setTimeout(() => {
+      if (!sessionPanel) {
+        console.log('🔄 Idle — installing update now');
+        autoUpdater.quitAndInstall(false, true);
+      }
+    }, 60_000);
+  }
+});
+
+autoUpdater.on('error', (err) => {
+  console.error('Auto-updater error:', err?.message ?? err);
+});
+// ─────────────────────────────────────────────────────────────────────────────
 
 function getInstrumentConfigPath() {
   return path.join(app.getPath('userData'), 'instrument-config.json');
@@ -39,13 +87,6 @@ function saveInstrumentConfig(config) {
   );
 }
 
-function loadInstrumentConfig() {
-  const configPath = getInstrumentConfigPath();
-  if (fs.existsSync(configPath)) {
-    return JSON.parse(fs.readFileSync(configPath, 'utf8'));
-  }
-  return null;
-}
 
 async function verifyInstrumentEnabled(uuid) {
   try {
@@ -202,7 +243,7 @@ async function createLoginWindow() {
     mainWindow.loadFile('renderer/login.html');
 
     // Add crash detection and recovery
-    mainWindow.webContents.on('render-process-gone', (event, details) => {
+    mainWindow.webContents.on('render-process-gone', (_event, details) => {
       console.error('Renderer process crashed:', details);
       mainWindow.reload();
     });
@@ -275,18 +316,28 @@ async function createLoginWindow() {
     // immediately redirect the main window to /desktop-session.
     mainWindow.webContents.on('did-navigate', (_event, url) => {
       if (url.includes('/desktop-token')) {
+        // Token arrives via postMessage → token-received IPC before this fires.
+        // Only fall back to body scraping if postMessage didn't deliver it.
+        if (storedToken) return;
         mainWindow.webContents.executeJavaScript(
           'document.body ? document.body.textContent.trim() : ""'
         ).then(text => {
           // Strip any non-ASCII characters that could come from CSS or page decoration
           const clean = text.replace(/[^\x20-\x7E]/g, '').trim();
-          try {
-            const parsed = JSON.parse(clean);
-            storedToken = parsed.token;
-          } catch {
-            storedToken = clean; // plain token string fallback
+          // Try to extract a JSON object anywhere in the text (page may have surrounding content)
+          const jsonMatch = clean.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            try {
+              const parsed = JSON.parse(jsonMatch[0]);
+              storedToken = parsed.token;
+            } catch {
+              storedToken = null;
+            }
           }
-          console.log('✅ Token captured from /desktop-token');
+          if (!storedToken) {
+            // Last resort: assume the whole clean string is the raw token
+            storedToken = clean;
+          }
           if (loginWatcherInterval) {
             clearInterval(loginWatcherInterval);
             loginWatcherInterval = null;
@@ -328,7 +379,7 @@ async function createLoginWindow() {
     });
 
     // Handle network failures by retrying
-    mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL, isMainFrame) => {
+    mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription, _validatedURL, isMainFrame) => {
       // -3 is ERR_ABORTED, usually harmless (e.g. new navigation started)
       if (isMainFrame && errorCode !== -3) {
         console.log(`Page failed to load (${errorCode}: ${errorDescription}). Retrying in 10s...`);
@@ -341,7 +392,7 @@ async function createLoginWindow() {
     });
 
     // Add crash detection and recovery
-    mainWindow.webContents.on('render-process-gone', (event, details) => {
+    mainWindow.webContents.on('render-process-gone', (_event, details) => {
       console.error('Renderer process crashed:', details);
       mainWindow.reload();
     });
@@ -457,7 +508,7 @@ function createSessionPanel(token, username, sessionId, instrumentUuid) {
 function createBypassPanel(token) {
   clearSecondaryLockWindows();
 
-  const { width: screenWidth, height: screenHeight } = screen.getPrimaryDisplay().workAreaSize;
+  const { width: screenWidth } = screen.getPrimaryDisplay().workAreaSize;
 
   const windowWidth = 1080;
   const windowHeight = 84;
@@ -496,7 +547,19 @@ function createBypassPanel(token) {
   });
 }
 
-ipcMain.on('token-received', (event, msg) => {
+ipcMain.on('token-received', (_event, msg) => {
+  // Capture the Sanctum token posted by the web page via postMessage
+  try {
+    const parsed = typeof msg === 'string' ? JSON.parse(msg) : msg;
+    if (parsed?.token) {
+      storedToken = parsed.token;
+      console.log('✅ Token stored from postMessage:', `${storedToken.substring(0, 8)}...`);
+      return;
+    }
+  } catch {
+    // not JSON — fall through to other message types
+  }
+
   if (msg === 'logout-now') {
     if (sessionPanel) {
       sessionPanel.allowClose = true;
@@ -575,17 +638,28 @@ ipcMain.on('confirm-end-session', async () => {
   const { token, sessionId } = pendingStopPayload || {};
   pendingStopPayload = null;
 
-  if (!token || !sessionId) return;
+  if (!token || !sessionId) {
+    console.error('confirm-end-session: missing token or sessionId', { token: !!token, sessionId });
+    return;
+  }
+
+  const payload = { session_id: sessionId };
 
   try {
-    await fetch('https://openinstrument.com/api/sessions/stop', {
+    const response = await fetch('https://openinstrument.com/api/sessions/stop', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
       },
-      body: JSON.stringify({ session_id: sessionId })
+      body: JSON.stringify(payload)
     });
+
+    if (!response.ok) {
+      const responseText = await response.text();
+      console.error('Stop session API error:', response.status, responseText);
+    }
 
     if (sessionPanel) {
       sessionPanel.allowClose = true;
@@ -596,14 +670,20 @@ ipcMain.on('confirm-end-session', async () => {
 
     storedToken = null;
     await session.defaultSession.clearStorageData({ storages: ['cookies'] });
-    createLoginWindow();
+
+    if (updateDownloaded) {
+      console.log('🔄 Update pending — installing at session end');
+      autoUpdater.quitAndInstall(false, true);
+    } else {
+      createLoginWindow();
+    }
 
   } catch (err) {
     console.error('Failed to stop session:', err);
   }
 });
 
-ipcMain.on('end-session', async (event, { token, sessionId }) => {
+ipcMain.on('end-session', async (_event, { token, sessionId }) => {
   try {
     await fetch('https://openinstrument.com/api/sessions/stop', {
       method: 'POST',
@@ -625,14 +705,19 @@ ipcMain.on('end-session', async (event, { token, sessionId }) => {
     const ses = session.defaultSession;
     await ses.clearStorageData({ storages: ['cookies'] });
 
-    createLoginWindow();
+    if (updateDownloaded) {
+      console.log('🔄 Update pending — installing at session end');
+      autoUpdater.quitAndInstall(false, true);
+    } else {
+      createLoginWindow();
+    }
 
   } catch (err) {
     console.error('Failed to stop session or clear session:', err);
   }
 });
 
-ipcMain.on('start-bypass', async (event, { token }) => {
+ipcMain.on('start-bypass', async (_event, { token }) => {
   // ✅ Clear cookies and storage data when exiting bypass mode
   try {
     await session.defaultSession.clearStorageData({ storages: ['cookies'] });
@@ -648,7 +733,7 @@ const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
   app.quit();
 } else {
-  app.on('second-instance', (event, commandLine, workingDirectory) => {
+  app.on('second-instance', () => {
     // Someone tried to run a second instance, we should focus our window.
     if (mainWindow) {
       if (mainWindow.isMinimized()) mainWindow.restore();
@@ -681,7 +766,7 @@ if (!gotTheLock) {
     }
 
     const { powerSaveBlocker } = require('electron');
-    const blockerId = powerSaveBlocker.start('prevent-display-sleep')
+    powerSaveBlocker.start('prevent-display-sleep');
 
     if (process.platform === 'darwin') {
       app.dock.hide();
@@ -693,6 +778,21 @@ if (!gotTheLock) {
     }
 
     createLoginWindow();
+
+    // Schedule auto-update checks (only if updater token is configured)
+    if (updaterToken) {
+      setTimeout(() => {
+        autoUpdater.checkForUpdates().catch(err => {
+          console.error('Update check failed:', err?.message ?? err);
+        });
+
+        setInterval(() => {
+          autoUpdater.checkForUpdates().catch(err => {
+            console.error('Update check failed:', err?.message ?? err);
+          });
+        }, 4 * 60 * 60 * 1000); // every 4 hours
+      }, 30_000); // 30s startup delay
+    }
 
     powerMonitor.on('resume', () => {
       if (mainWindow && !mainWindow.isDestroyed()) {
@@ -853,13 +953,12 @@ app.on('browser-window-created', (_, window) => {
         win.destroy();
       });
       mainWindow = null;
-      reservationWindow = null;
       session.defaultSession.clearStorageData({ storages: ['cookies'] }).then(() => {
         createBypassPanel(null);
       });
     }
   });
 });
-app.on('window-all-closed', (event) => {
+app.on('window-all-closed', () => {
   // Do nothing here to prevent app from quitting when all windows are closed
 });
