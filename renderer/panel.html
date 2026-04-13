@@ -29,12 +29,41 @@
         border-radius: 8px;
         -webkit-app-region: no-drag;
       }
+      .online-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: rgba(34, 197, 94, 0.15);
+        border: 1px solid rgba(34, 197, 94, 0.4);
+        border-radius: 999px;
+        padding: 3px 10px 3px 8px;
+        font-size: 14px;
+        color: #4ade80;
+        font-weight: 500;
+        vertical-align: middle;
+        margin-right: 8px;
+      }
+      .pulse-dot {
+        width: 8px;
+        height: 8px;
+        background: #4ade80;
+        border-radius: 50%;
+        flex-shrink: 0;
+        animation: pulse 1.8s ease-in-out infinite;
+      }
+      @keyframes pulse {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50% { opacity: 0.4; transform: scale(0.75); }
+      }
     </style>
   </head>
   <body>
     <div id="container">
       <div><span id="username">...</span></div>
-      <div>Session Active — <span id="timer">00:00</span></div>
+      <div>
+        <span class="online-badge"><span class="pulse-dot"></span>Online</span>
+        Session Active — <span id="timer">00:00</span>
+      </div>
       <div>
         <button onclick="stopSession()">Stop</button>
       </div>
@@ -49,7 +78,8 @@
           data?.username?.trim() || "User";
         token = data.token;
         sessionId = data.sessionId;
-        endTime = new Date(data.endTime);
+        const toUtc = (str) => /Z|[+-]\d{2}:?\d{2}$/.test(str) ? str : str.replace(' ', 'T') + 'Z';
+        endTime = new Date(toUtc(data.endTime));
 
         startTime = new Date();
         timerInterval = setInterval(updateTimer, 1000);
