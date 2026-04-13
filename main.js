@@ -11,12 +11,11 @@ const { powerMonitor } = require('electron');
 
 let mainWindow;
 let sessionPanel;
-let reservationWindow;
-let lastUsername = 'User';
 let loginWatcherInterval = null;
 let focusMonitorInterval = null;
 let heartbeatInterval = null;
 let secondaryLockWindows = [];
+let storedToken = null;
 
 function getInstrumentConfigPath() {
   return path.join(app.getPath('userData'), 'instrument-config.json');
@@ -44,6 +43,17 @@ function loadInstrumentConfig() {
     return JSON.parse(fs.readFileSync(configPath, 'utf8'));
   }
   return null;
+}
+
+async function verifyInstrumentEnabled(uuid) {
+  try {
+    const res = await fetch(`https://openinstrument.com/api/instruments/${uuid}`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.desktop_enabled ? data : null;
+  } catch {
+    return true; // fail open — if server unreachable, allow through
+  }
 }
 
 function startHeartbeat(instrumentUuid) {
@@ -136,7 +146,28 @@ function clearSecondaryLockWindows() {
   secondaryLockWindows = [];
 }
 
-function createLoginWindow() {
+function createDisabledWindow() {
+  mainWindow = new BrowserWindow({
+    width: 600,
+    height: 300,
+    backgroundColor: '#09090b',
+    resizable: false,
+    fullscreenable: false,
+    frame: false,
+    autoHideMenuBar: true,
+    skipTaskbar: true,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+    }
+  });
+  mainWindow.loadFile('renderer/disabled.html');
+  mainWindow.allowClose = true;
+  mainWindow.on('closed', () => mainWindow = null);
+}
+
+async function createLoginWindow() {
   clearSecondaryLockWindows();
 
   if (mainWindow) {
@@ -179,8 +210,15 @@ function createLoginWindow() {
       mainWindow.reload();
     });
   } else {
-    startHeartbeat(loadInstrumentUuid());
-    // UUID is present, launch into full kiosk mode
+    startHeartbeat(instrumentUuid);
+
+    const enabled = await verifyInstrumentEnabled(instrumentUuid);
+    if (!enabled) {
+      createDisabledWindow();
+      return;
+    }
+
+    // UUID is present and desktop is enabled — launch into full kiosk mode
 
     if (process.platform === 'darwin') {
       // macOS: use maximized window with simpleFullScreen to avoid separate Space
@@ -226,6 +264,62 @@ function createLoginWindow() {
     const welcomeUrl = `https://openinstrument.com/desktop-welcome?instrument_uuid=${instrumentUuid}`;
     mainWindow.loadURL(welcomeUrl);
     createSecondaryLockWindows();
+
+    // Intercept navigation to /desktop-token — capture the Sanctum token and
+    // immediately redirect the main window to /desktop-session.
+    mainWindow.webContents.on('did-navigate', (_event, url) => {
+      if (url.includes('/desktop-token')) {
+        mainWindow.webContents.executeJavaScript(
+          'document.body ? document.body.textContent.trim() : ""'
+        ).then(text => {
+          // Strip any non-ASCII characters that could come from CSS or page decoration
+          const clean = text.replace(/[^\x20-\x7E]/g, '').trim();
+          try {
+            const parsed = JSON.parse(clean);
+            storedToken = parsed.token;
+          } catch {
+            storedToken = clean; // plain token string fallback
+          }
+          console.log('✅ Token captured from /desktop-token');
+          if (loginWatcherInterval) {
+            clearInterval(loginWatcherInterval);
+            loginWatcherInterval = null;
+          }
+          const sessionUrl = `https://openinstrument.com/desktop-session?instrument_uuid=${instrumentUuid}`;
+          mainWindow.loadURL(sessionUrl);
+        }).catch(err => console.error('Failed to capture token:', err));
+      }
+    });
+
+    // Intercept navigation to /desktop-session-started — extract session info,
+    // hide the main window, and open the always-on-top panel.
+    mainWindow.webContents.on('did-navigate', (_event, url) => {
+      if (url.includes('/desktop-session-started')) {
+        const parsed = new URL(url);
+        const sessionId = parsed.searchParams.get('session_id');
+        const userName = parsed.searchParams.get('user_name') || 'User';
+        const sessionInstrumentUuid = parsed.searchParams.get('instrument_uuid') || instrumentUuid;
+
+        console.log('✅ Session started — opening panel');
+
+        if (loginWatcherInterval) {
+          clearInterval(loginWatcherInterval);
+          loginWatcherInterval = null;
+        }
+        if (focusMonitorInterval) {
+          clearInterval(focusMonitorInterval);
+          focusMonitorInterval = null;
+        }
+
+        mainWindow.allowClose = true;
+        mainWindow.close();
+        mainWindow.destroy();
+        mainWindow = null;
+
+        clearSecondaryLockWindows();
+        createSessionPanel(storedToken, userName, sessionId, sessionInstrumentUuid);
+      }
+    });
 
     // Handle network failures by retrying
     mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL, isMainFrame) => {
@@ -284,23 +378,24 @@ function createLoginWindow() {
         }
       }, 500); // Check every 500ms
 
-      // Removed update check on load to prevent update checks on app launch
-
       loginWatcherInterval = setInterval(() => {
         if (!mainWindow) return;
 
         const currentUrl = mainWindow.webContents.getURL();
         console.log('🔄 Checking URL:', currentUrl);
 
-        if (!currentUrl.includes('/desktop-welcome')) {
-          console.log('⌛ User is off welcome page. Resetting to welcome.');
+        const validPages = ['/desktop-welcome', '/desktop-login', '/desktop-session'];
+        const onValidPage = validPages.some(p => currentUrl.includes(p));
+
+        if (!onValidPage) {
+          console.log('⌛ User is off a valid page. Resetting to welcome.');
           mainWindow.allowClose = true;
           mainWindow.close();
           mainWindow.destroy();
           mainWindow = null;
           createLoginWindow();
         } else {
-          console.log('✅ User is still on welcome. No action needed.');
+          console.log('✅ User is on a valid page. No action needed.');
         }
       }, 5 * 60 * 1000); // every 5 minutes
     });
@@ -309,8 +404,8 @@ function createLoginWindow() {
   mainWindow.on('closed', () => mainWindow = null);
 }
 
-function createSessionPanel(token, username, sessionId, endTime) {
-  const { width: screenWidth, height: screenHeight } = screen.getPrimaryDisplay().workAreaSize;
+function createSessionPanel(token, username, sessionId, instrumentUuid) {
+  const { width: screenWidth } = screen.getPrimaryDisplay().workAreaSize;
 
   const windowWidth = 1080;
   const windowHeight = 84;
@@ -324,13 +419,13 @@ function createSessionPanel(token, username, sessionId, endTime) {
     height: windowHeight,
     x: x,
     y: y,
-    backgroundColor: '#111827', // <-- Tailwind "gray-900"
+    backgroundColor: '#09090b',
     fullscreen: false,
     frame: false,
     alwaysOnTop: true,
     resizable: false,
-    autoHideMenuBar: true,    // Windows/Linux: hides the Alt-menu bar
-    skipTaskbar: true,        // hides from Windows taskbar / Linux dock
+    autoHideMenuBar: true,
+    skipTaskbar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -342,64 +437,10 @@ function createSessionPanel(token, username, sessionId, endTime) {
 
   sessionPanel.loadFile('renderer/panel.html');
   sessionPanel.webContents.once('did-finish-load', () => {
-    sessionPanel.webContents.send('session-info', { token, username, sessionId, endTime });
+    sessionPanel.webContents.send('session-info', { token, username, sessionId, instrumentUuid });
   });
 }
 
-function createReservationWindow(token, username) {
-  const instrumentUuid = loadInstrumentUuid();
-
-  if (process.platform === 'darwin') {
-    // macOS: use maximized window with simpleFullScreen to avoid separate Space
-    const { width, height } = screen.getPrimaryDisplay().bounds;
-    reservationWindow = new BrowserWindow({
-      width: width,
-      height: height,
-      x: 0,
-      y: 0,
-      backgroundColor: '#111827',
-      frame: false,
-      alwaysOnTop: true,
-      resizable: false,
-      fullscreenable: false,
-      autoHideMenuBar: true,
-      skipTaskbar: true,
-      webPreferences: {
-        preload: path.join(__dirname, 'preload.js'),
-        contextIsolation: true,
-        nodeIntegration: false
-      }
-    });
-    reservationWindow.setSimpleFullScreen(true);
-  } else {
-    // Windows/Linux: use traditional fullscreen + kiosk mode
-    reservationWindow = new BrowserWindow({
-      fullscreen: true,
-      frame: false,
-      kiosk: true,
-      backgroundColor: '#111827',
-      alwaysOnTop: true,
-      resizable: false,
-      autoHideMenuBar: true,
-      skipTaskbar: true,
-      webPreferences: {
-        preload: path.join(__dirname, 'preload.js'),
-        contextIsolation: true,
-        nodeIntegration: false
-      }
-    });
-  }
-
-  reservationWindow.loadFile('renderer/reservation.html');
-
-  reservationWindow.webContents.once('did-finish-load', () => {
-    reservationWindow.webContents.send('reservation-data', {
-      token,
-      username,
-      instrumentUuid
-    });
-  });
-}
 
 function createBypassPanel(token) {
   clearSecondaryLockWindows();
@@ -445,12 +486,6 @@ function createBypassPanel(token) {
 
 ipcMain.on('token-received', (event, msg) => {
   if (msg === 'logout-now') {
-    if (reservationWindow) {
-      reservationWindow.allowClose = true;
-      reservationWindow.close();
-      reservationWindow.destroy();
-      reservationWindow = null;
-    }
     if (sessionPanel) {
       sessionPanel.allowClose = true;
       sessionPanel.close();
@@ -469,10 +504,9 @@ ipcMain.on('token-received', (event, msg) => {
   }
 
   if (msg.startsWith('save-instrument:')) {
-    const jsonString = msg.substring('save-instrument:'.length); // slice after "save-instrument:"
+    const jsonString = msg.substring('save-instrument:'.length);
     const config = JSON.parse(jsonString);
     saveInstrumentConfig(config);
-    // Properly restart app into fullscreen mode
     if (mainWindow) {
       mainWindow.allowClose = true;
       mainWindow.close();
@@ -480,46 +514,9 @@ ipcMain.on('token-received', (event, msg) => {
       mainWindow = null;
     }
     createLoginWindow();
-  } else {
-    const { token, username } = JSON.parse(msg);
-    lastUsername = username;
-    if (mainWindow) {
-      mainWindow.allowClose = true;
-      mainWindow.close();
-      mainWindow.destroy();
-      mainWindow = null;
-    }
-    createReservationWindow(token, username);
   }
 });
 
-ipcMain.on('start-session', async (event, { token, reservationId, endTime }) => {
-  try {
-    const response = await fetch('https://openinstrument.com/api/sessions/start', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ reservation_id: reservationId })
-    });
-
-    const result = await response.json();
-    const sessionId = result.session_id;
-
-    if (reservationWindow) {
-      reservationWindow.allowClose = true;
-      reservationWindow.close();
-      reservationWindow.destroy();
-      reservationWindow = null;
-    }
-    clearSecondaryLockWindows();
-    createSessionPanel(token, lastUsername, sessionId, endTime);
-
-  } catch (err) {
-    console.error('Start session error:', err);
-  }
-});
 
 ipcMain.on('end-session', async (event, { token, sessionId }) => {
   try {
@@ -539,9 +536,7 @@ ipcMain.on('end-session', async (event, { token, sessionId }) => {
       sessionPanel = null;
     }
 
-    // Clear cookies and storage data
-    // This is important to ensure that the session is properly cleared
-    // and that no sensitive data remains in the session.
+    storedToken = null;
     const ses = session.defaultSession;
     await ses.clearStorageData({ storages: ['cookies'] });
 
@@ -553,13 +548,6 @@ ipcMain.on('end-session', async (event, { token, sessionId }) => {
 });
 
 ipcMain.on('start-bypass', async (event, { token }) => {
-  if (reservationWindow) {
-    reservationWindow.allowClose = true;
-    reservationWindow.close();
-    reservationWindow.destroy();
-    reservationWindow = null;
-  }
-
   // ✅ Clear cookies and storage data when exiting bypass mode
   try {
     await session.defaultSession.clearStorageData({ storages: ['cookies'] });

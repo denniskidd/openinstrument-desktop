@@ -83,6 +83,13 @@
 
           const instrument = await response.json();
 
+          if (!instrument.desktop_enabled) {
+            alert("This instrument has not been enabled for desktop use. Please contact your administrator.");
+            saveBtn.innerText = "Save";
+            saveBtn.disabled = false;
+            return;
+          }
+
           // Now save the UUID + instrument info
           window.electronAPI.sendToken(
             `save-instrument:${JSON.stringify({

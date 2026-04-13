@@ -3,49 +3,75 @@
   <head>
     <title>Session Active</title>
     <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
       body {
-        background: #222;
+        background: #09090b;
         color: #fff;
-        font-family: sans-serif;
-        font-size: 20px;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        font-size: 15px;
+        height: 100vh;
+        overflow: hidden;
+        border-bottom: 1px solid rgba(255,255,255,0.08);
       }
       #container {
         display: flex;
         justify-content: space-between;
         align-items: center;
         width: 100%;
-        max-width: 100vw;
-        box-sizing: border-box;
+        height: 100%;
+        padding: 0 1.5rem;
         -webkit-app-region: drag;
-        padding: 1rem 1.5rem;
       }
-      button {
-        background: red;
-        border: none;
-        padding: 8px 16px;
-        color: white;
-        font-size: 16px;
-        cursor: pointer;
-        border-radius: 8px;
-        -webkit-app-region: no-drag;
+      .left {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-width: 0;
+      }
+      .avatar {
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        background: #7069DA;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 13px;
+        font-weight: 600;
+        flex-shrink: 0;
+        color: #fff;
+      }
+      #username {
+        font-weight: 500;
+        color: #e4e4e7;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .center {
+        display: flex;
+        align-items: center;
+        gap: 10px;
       }
       .online-badge {
         display: inline-flex;
         align-items: center;
         gap: 6px;
-        background: rgba(34, 197, 94, 0.15);
-        border: 1px solid rgba(34, 197, 94, 0.4);
+        background: rgba(34, 197, 94, 0.12);
+        border: 1px solid rgba(34, 197, 94, 0.35);
         border-radius: 999px;
         padding: 3px 10px 3px 8px;
-        font-size: 14px;
+        font-size: 12px;
         color: #4ade80;
         font-weight: 500;
-        vertical-align: middle;
-        margin-right: 8px;
       }
       .pulse-dot {
-        width: 8px;
-        height: 8px;
+        width: 7px;
+        height: 7px;
         background: #4ade80;
         border-radius: 50%;
         flex-shrink: 0;
@@ -53,87 +79,84 @@
       }
       @keyframes pulse {
         0%, 100% { opacity: 1; transform: scale(1); }
-        50% { opacity: 0.4; transform: scale(0.75); }
+        50%       { opacity: 0.4; transform: scale(0.75); }
+      }
+#timer {
+        font-size: 15px;
+        font-weight: 600;
+        color: #e4e4e7;
+        font-variant-numeric: tabular-nums;
+        letter-spacing: 0.02em;
+      }
+      #timer.expired {
+        color: #f87171;
+      }
+      .right {
+        display: flex;
+        align-items: center;
+        -webkit-app-region: no-drag;
+      }
+      button {
+        background: transparent;
+        border: 1px solid rgba(239, 68, 68, 0.6);
+        color: #f87171;
+        padding: 6px 16px;
+        font-size: 13px;
+        font-weight: 500;
+        cursor: pointer;
+        border-radius: 6px;
+        font-family: inherit;
+        transition: background 0.15s, border-color 0.15s;
+        -webkit-app-region: no-drag;
+      }
+      button:hover {
+        background: rgba(239, 68, 68, 0.15);
+        border-color: rgba(239, 68, 68, 0.9);
       }
     </style>
   </head>
   <body>
     <div id="container">
-      <div><span id="username">...</span></div>
-      <div>
-        <span class="online-badge"><span class="pulse-dot"></span>Online</span>
-        Session Active — <span id="timer">00:00</span>
+      <div class="left">
+        <div class="avatar" id="avatar">?</div>
+        <span id="username">...</span>
       </div>
-      <div>
-        <button onclick="stopSession()">Stop</button>
+      <div class="center">
+        <span class="online-badge"><span class="pulse-dot"></span>Session Active</span>
+        <span id="timer">00:00:00</span>
+      </div>
+      <div class="right">
+        <button onclick="stopSession()">End Session</button>
       </div>
     </div>
 
     <script>
-      let token, sessionId;
-      let startTime, endTime, timerInterval;
+      let token, sessionId, instrumentUuid;
+      let startTime, timerInterval;
 
       window.electronAPI.onSessionInfo((data) => {
-        document.getElementById("username").innerText =
-          data?.username?.trim() || "User";
+        const name = data?.username?.trim() || 'User';
+        document.getElementById("username").innerText = name;
+        document.getElementById("avatar").innerText = name.charAt(0).toUpperCase();
+
         token = data.token;
         sessionId = data.sessionId;
-        const toUtc = (str) => /Z|[+-]\d{2}:?\d{2}$/.test(str) ? str : str.replace(' ', 'T') + 'Z';
-        endTime = new Date(toUtc(data.endTime));
+        instrumentUuid = data.instrumentUuid;
 
         startTime = new Date();
         timerInterval = setInterval(updateTimer, 1000);
-
-        //check for admin status
-        let isAdmin = false;
-
-        async function checkAdminStatus() {
-          try {
-            const response = await fetch(
-              `https://openinstrument.com/api/instruments/${instrumentUuid}/admin-check`,
-              {
-                headers: {
-                  Authorization: `Bearer ${token}`,
-                },
-              }
-            );
-
-            if (response.ok) {
-              const data = await response.json();
-              isAdmin = data.is_admin;
-              if (isAdmin) {
-                document.getElementById("bypassButton").style.display = "block";
-              }
-            } else {
-              console.error("Failed to check admin status.");
-            }
-          } catch (err) {
-            console.error("Error checking admin status:", err);
-          }
-        }
       });
 
-      let sessionExpired = false;
-
       function updateTimer() {
-        const now = new Date();
-        const diff = Math.floor((now - startTime) / 1000);
-
-        const hours = String(Math.floor(diff / 3600)).padStart(2, "0");
-        const minutes = String(Math.floor((diff % 3600) / 60)).padStart(2, "0");
-        const seconds = String(diff % 60).padStart(2, "0");
-
-        const timerEl = document.getElementById("timer");
-        timerEl.innerText = `${hours}:${minutes}:${seconds}`;
-
-        if (endTime && now > endTime && !sessionExpired) {
-          timerEl.style.color = "red";
-          sessionExpired = true;
-        }
+        const diff = Math.floor((new Date() - startTime) / 1000);
+        const h = String(Math.floor(diff / 3600)).padStart(2, "0");
+        const m = String(Math.floor((diff % 3600) / 60)).padStart(2, "0");
+        const s = String(diff % 60).padStart(2, "0");
+        document.getElementById("timer").innerText = `${h}:${m}:${s}`;
       }
 
       function stopSession() {
-        if (confirm("Are you sure you want to stop the session?")) {
+        if (confirm("Are you sure you want to end the session?")) {
           clearInterval(timerInterval);
           window.electronAPI.sendStopSession({ token, sessionId });
         }

@@ -3,40 +3,90 @@
   <head>
     <title>Bypass Mode</title>
     <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
       body {
-        background: #222;
+        background: #09090b;
         color: #fff;
-        font-family: sans-serif;
-        font-size: 20px;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        font-size: 15px;
+        height: 100vh;
+        overflow: hidden;
+        border-bottom: 1px solid rgba(255,255,255,0.08);
       }
       #container {
         display: flex;
         justify-content: space-between;
         align-items: center;
         width: 100%;
-        max-width: 100vw;
-        box-sizing: border-box;
+        height: 100%;
+        padding: 0 1.5rem;
         -webkit-app-region: drag;
-        padding: 1rem 1.5rem;
+      }
+      .left {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .bypass-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: rgba(250, 204, 21, 0.12);
+        border: 1px solid rgba(250, 204, 21, 0.35);
+        border-radius: 999px;
+        padding: 3px 10px 3px 8px;
+        font-size: 12px;
+        color: #fde047;
+        font-weight: 500;
+      }
+      .pulse-dot {
+        width: 7px;
+        height: 7px;
+        background: #fde047;
+        border-radius: 50%;
+        flex-shrink: 0;
+        animation: pulse 1.8s ease-in-out infinite;
+      }
+      @keyframes pulse {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50%       { opacity: 0.4; transform: scale(0.75); }
+      }
+      .right {
+        display: flex;
+        align-items: center;
+        -webkit-app-region: no-drag;
       }
       button {
-        background: red;
-        border: none;
-        padding: 8px 16px;
-        color: white;
-        font-size: 16px;
+        background: transparent;
+        border: 1px solid rgba(250, 204, 21, 0.5);
+        color: #fde047;
+        padding: 6px 16px;
+        font-size: 13px;
+        font-weight: 500;
         cursor: pointer;
-        border-radius: 8px;
+        border-radius: 6px;
+        font-family: inherit;
+        transition: background 0.15s, border-color 0.15s;
         -webkit-app-region: no-drag;
+      }
+      button:hover {
+        background: rgba(250, 204, 21, 0.12);
+        border-color: rgba(250, 204, 21, 0.8);
       }
     </style>
   </head>
   <body>
     <div id="container">
-      <div>Bypass Mode</div>
+      <div class="left">
+        <span class="bypass-badge"><span class="pulse-dot"></span>Bypass Mode</span>
+      </div>
       <div></div>
-      <div>
-        <button onclick="exitBypass()">Exit Bypass Mode</button>
+      <div class="right">
+        <button onclick="exitBypass()">Exit Bypass</button>
       </div>
     </div>
 
