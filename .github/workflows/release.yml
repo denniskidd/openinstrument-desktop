@@ -40,6 +40,9 @@ jobs:
           CERT_P12: ${{ secrets.CERT_P12 }}
           CERT_PASSWORD: ${{ secrets.CERT_PASSWORD }}
 
+      - name: Create updater config
+        run: echo '{"token":"${{ secrets.UPDATER_TOKEN }}"}' > updater-config.json
+
       - name: Build and publish (electron-builder)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
