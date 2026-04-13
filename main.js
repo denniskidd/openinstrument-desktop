@@ -16,6 +16,8 @@ let focusMonitorInterval = null;
 let heartbeatInterval = null;
 let secondaryLockWindows = [];
 let storedToken = null;
+let confirmWindow = null;
+let pendingStopPayload = null;
 
 function getInstrumentConfigPath() {
   return path.join(app.getPath('userData'), 'instrument-config.json');
@@ -259,6 +261,10 @@ async function createLoginWindow() {
           nodeIntegration: false,
         }
       });
+      // On Windows, use screen-saver level to render above the taskbar
+      if (process.platform === 'win32') {
+        mainWindow.setAlwaysOnTop(true, 'screen-saver');
+      }
     }
 
     const welcomeUrl = `https://openinstrument.com/desktop-welcome?instrument_uuid=${instrumentUuid}`;
@@ -374,6 +380,9 @@ async function createLoginWindow() {
           mainWindow.moveTop();
           if (process.platform === 'darwin') {
             app.focus({ steal: true });
+          } else if (process.platform === 'win32') {
+            app.focus({ steal: true });
+            mainWindow.setKiosk(true);
           }
         }
       }, 500); // Check every 500ms
@@ -432,6 +441,9 @@ function createSessionPanel(token, username, sessionId, instrumentUuid) {
       nodeIntegration: false
     }
   });
+  if (process.platform === 'win32') {
+    sessionPanel.setAlwaysOnTop(true, 'screen-saver');
+  }
   sessionPanel.focus();
   sessionPanel.show();
 
@@ -517,6 +529,79 @@ ipcMain.on('token-received', (event, msg) => {
   }
 });
 
+
+function createConfirmWindow() {
+  const { width, height } = screen.getPrimaryDisplay().workAreaSize;
+  confirmWindow = new BrowserWindow({
+    width: 360,
+    height: 200,
+    x: Math.floor((width - 360) / 2),
+    y: Math.floor((height - 200) / 2),
+    backgroundColor: '#18181b',
+    frame: false,
+    resizable: false,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+    }
+  });
+  confirmWindow.loadFile('renderer/confirm.html');
+  confirmWindow.allowClose = true;
+  confirmWindow.on('closed', () => confirmWindow = null);
+}
+
+ipcMain.on('show-end-confirm', (_event, payload) => {
+  pendingStopPayload = payload;
+  createConfirmWindow();
+});
+
+ipcMain.on('cancel-end-confirm', () => {
+  if (confirmWindow) {
+    confirmWindow.close();
+    confirmWindow = null;
+  }
+  pendingStopPayload = null;
+});
+
+ipcMain.on('confirm-end-session', async () => {
+  if (confirmWindow) {
+    confirmWindow.close();
+    confirmWindow = null;
+  }
+
+  const { token, sessionId } = pendingStopPayload || {};
+  pendingStopPayload = null;
+
+  if (!token || !sessionId) return;
+
+  try {
+    await fetch('https://openinstrument.com/api/sessions/stop', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ session_id: sessionId })
+    });
+
+    if (sessionPanel) {
+      sessionPanel.allowClose = true;
+      sessionPanel.close();
+      sessionPanel.destroy();
+      sessionPanel = null;
+    }
+
+    storedToken = null;
+    await session.defaultSession.clearStorageData({ storages: ['cookies'] });
+    createLoginWindow();
+
+  } catch (err) {
+    console.error('Failed to stop session:', err);
+  }
+});
 
 ipcMain.on('end-session', async (event, { token, sessionId }) => {
   try {
@@ -688,6 +773,34 @@ app.on('browser-window-created', (_, window) => {
       window.focus();
       window.moveTop();
       return;
+    }
+
+    // Windows: block system shortcuts that expose the taskbar/desktop/switcher
+    if (!isMac) {
+      // Win key (Start menu, Task View, Win+D, Win+M, etc.)
+      if (input.meta) {
+        event.preventDefault();
+        console.log('🚫 Win key blocked — refocusing window');
+        window.show();
+        window.focus();
+        window.moveTop();
+        return;
+      }
+      // Alt+Tab (app switcher)
+      if (input.alt && input.code === 'Tab') {
+        event.preventDefault();
+        console.log('🚫 Alt+Tab blocked — refocusing window');
+        window.show();
+        window.focus();
+        window.moveTop();
+        return;
+      }
+      // Ctrl+Esc (alternate Start menu shortcut)
+      if (input.control && input.code === 'Escape') {
+        event.preventDefault();
+        console.log('🚫 Ctrl+Esc blocked');
+        return;
+      }
     }
 
     const adminExit =

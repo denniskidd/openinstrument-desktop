@@ -9,6 +9,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onSessionInfo: (callback) => ipcRenderer.on('session-info', (event, data) => callback(data)),
   sendExitBypass: () => ipcRenderer.send('exit-bypass'),
   exitApp: () => ipcRenderer.send('app-exit'),
+  showEndConfirm: (payload) => ipcRenderer.send('show-end-confirm', payload),
+  confirmEndSession: () => ipcRenderer.send('confirm-end-session'),
+  cancelEndConfirm: () => ipcRenderer.send('cancel-end-confirm'),
 });
 
 window.addEventListener('message', (event) => {

@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>End Session</title>
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        background: #18181b;
+        color: #fff;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        padding: 1.5rem;
+        border: 1px solid rgba(255,255,255,0.1);
+        border-radius: 10px;
+        -webkit-app-region: drag;
+      }
+      .content {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      h2 {
+        font-size: 15px;
+        font-weight: 600;
+        color: #f4f4f5;
+      }
+      p {
+        font-size: 13px;
+        color: #a1a1aa;
+        line-height: 1.5;
+      }
+      .actions {
+        display: flex;
+        gap: 8px;
+        justify-content: flex-end;
+        -webkit-app-region: no-drag;
+      }
+      button {
+        font-family: inherit;
+        font-size: 13px;
+        font-weight: 500;
+        padding: 7px 16px;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: background 0.15s, border-color 0.15s;
+      }
+      .btn-cancel {
+        background: transparent;
+        border: 1px solid rgba(255,255,255,0.15);
+        color: #a1a1aa;
+      }
+      .btn-cancel:hover {
+        background: rgba(255,255,255,0.06);
+        border-color: rgba(255,255,255,0.3);
+        color: #e4e4e7;
+      }
+      .btn-confirm {
+        background: rgba(239, 68, 68, 0.15);
+        border: 1px solid rgba(239, 68, 68, 0.5);
+        color: #f87171;
+      }
+      .btn-confirm:hover {
+        background: rgba(239, 68, 68, 0.25);
+        border-color: rgba(239, 68, 68, 0.8);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="content">
+      <h2>End Session?</h2>
+      <p>Your session will be stopped and you will be logged out of this instrument.</p>
+    </div>
+    <div class="actions">
+      <button class="btn-cancel" onclick="window.electronAPI.cancelEndConfirm()">Cancel</button>
+      <button class="btn-confirm" onclick="window.electronAPI.confirmEndSession()">End Session</button>
+    </div>
+  </body>
+</html>

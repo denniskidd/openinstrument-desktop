@@ -81,7 +81,7 @@
         0%, 100% { opacity: 1; transform: scale(1); }
         50%       { opacity: 0.4; transform: scale(0.75); }
       }
-#timer {
+      #timer {
         font-size: 15px;
         font-weight: 600;
         color: #e4e4e7;
@@ -96,7 +96,7 @@
         align-items: center;
         -webkit-app-region: no-drag;
       }
-      button {
+      button.end-btn {
         background: transparent;
         border: 1px solid rgba(239, 68, 68, 0.6);
         color: #f87171;
@@ -109,10 +109,11 @@
         transition: background 0.15s, border-color 0.15s;
         -webkit-app-region: no-drag;
       }
-      button:hover {
+      button.end-btn:hover {
         background: rgba(239, 68, 68, 0.15);
         border-color: rgba(239, 68, 68, 0.9);
       }
+
     </style>
   </head>
   <body>
@@ -126,9 +127,10 @@
         <span id="timer">00:00:00</span>
       </div>
       <div class="right">
-        <button onclick="stopSession()">End Session</button>
+        <button class="end-btn" onclick="promptStopSession()">End Session</button>
       </div>
     </div>
+
 
     <script>
       let token, sessionId, instrumentUuid;
@@ -155,11 +157,8 @@
         document.getElementById("timer").innerText = `${h}:${m}:${s}`;
       }
 
-      function stopSession() {
-        if (confirm("Are you sure you want to end the session?")) {
-          clearInterval(timerInterval);
-          window.electronAPI.sendStopSession({ token, sessionId });
-        }
+      function promptStopSession() {
+        window.electronAPI.showEndConfirm({ token, sessionId });
       }
     </script>
   </body>
