@@ -1,5 +1,10 @@
 const { app, BrowserWindow, ipcMain, session, Menu, screen } = require('electron');
 const { autoUpdater } = require('electron-updater');
+const log = require('electron-log');
+
+autoUpdater.logger = log;
+autoUpdater.logger.transports.file.level = 'info';
+log.info('App starting...');
 
 if (process.platform === 'linux') {
   app.commandLine.appendSwitch('gtk-version', '3');
@@ -30,8 +35,9 @@ const updaterConfigPath = app.isPackaged
 let updaterToken = null;
 try {
   updaterToken = JSON.parse(fs.readFileSync(updaterConfigPath, 'utf8')).token;
+  console.log('🔑 Updater token loaded, isPackaged:', app.isPackaged);
 } catch {
-  console.warn('updater-config.json not found — update checks will be skipped');
+  console.warn('⚠️ updater-config.json not found at', updaterConfigPath, '— update checks will be skipped');
 }
 
 if (updaterToken) {
@@ -45,6 +51,18 @@ if (updaterToken) {
 }
 autoUpdater.autoDownload = true;
 autoUpdater.autoInstallOnAppQuit = false; // we control install timing
+
+autoUpdater.on('checking-for-update', () => {
+  console.log('🔍 Checking for update...');
+});
+
+autoUpdater.on('update-available', (info) => {
+  console.log('⬆️  Update available:', info.version);
+});
+
+autoUpdater.on('update-not-available', (info) => {
+  console.log('✅ App is up to date:', info.version);
+});
 
 autoUpdater.on('update-downloaded', () => {
   updateDownloaded = true;
@@ -63,7 +81,7 @@ autoUpdater.on('update-downloaded', () => {
 });
 
 autoUpdater.on('error', (err) => {
-  console.error('Auto-updater error:', err?.message ?? err);
+  console.error('🚨 Auto-updater error:', err?.message ?? err);
 });
 // ─────────────────────────────────────────────────────────────────────────────
 
