@@ -396,6 +396,37 @@ async function createLoginWindow() {
       }
     });
 
+    // Block any navigation attempt that leaves openinstrument.com entirely
+    mainWindow.webContents.on('will-navigate', (event, url) => {
+      try {
+        const parsed = new URL(url);
+        if (!parsed.hostname.endsWith('openinstrument.com')) {
+          event.preventDefault();
+          console.log('🚫 Blocked off-domain navigation:', url);
+        }
+      } catch {
+        event.preventDefault();
+      }
+    });
+
+    // Catch landing on non-desktop pages (e.g. 500 error, accidental navigation)
+    // and redirect back to the welcome screen immediately.
+    const desktopPaths = [
+      '/desktop-welcome',
+      '/desktop-login',
+      '/desktop-session',
+      '/desktop-token',
+      '/desktop-session-started',
+    ];
+    mainWindow.webContents.on('did-navigate', (_event, url) => {
+      if (!url.startsWith('https://openinstrument.com')) return;
+      const isDesktopPage = desktopPaths.some(p => url.includes(p));
+      if (!isDesktopPage) {
+        console.log('⚠️ Landed on non-desktop page — resetting to welcome:', url);
+        mainWindow.loadURL(welcomeUrl);
+      }
+    });
+
     // Handle network failures by retrying
     mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription, _validatedURL, isMainFrame) => {
       // -3 is ERR_ABORTED, usually harmless (e.g. new navigation started)
@@ -476,6 +507,22 @@ async function createLoginWindow() {
           console.log('✅ User is on a valid page. No action needed.');
         }
       }, 5 * 60 * 1000); // every 5 minutes
+
+      // Idle timeout — if user sits on the login or reservation page without
+      // interacting for 5 minutes, reset back to the welcome screen.
+      const IDLE_TIMEOUT_SECONDS = 5 * 60;
+      setInterval(() => {
+        if (!mainWindow || mainWindow.isDestroyed()) return;
+
+        const currentUrl = mainWindow.webContents.getURL();
+        const isIdlePage = currentUrl.includes('/desktop-login') ||
+                           currentUrl.includes('/desktop-session');
+
+        if (isIdlePage && powerMonitor.getSystemIdleTime() >= IDLE_TIMEOUT_SECONDS) {
+          console.log('⏱️ Idle timeout — resetting to welcome screen');
+          mainWindow.loadURL(welcomeUrl);
+        }
+      }, 60_000); // check every minute
     });
   }
 
