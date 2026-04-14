@@ -335,8 +335,12 @@ async function createLoginWindow() {
     mainWindow.webContents.on('did-navigate', (_event, url) => {
       if (url.includes('/desktop-token')) {
         // Token arrives via postMessage → token-received IPC before this fires.
-        // Only fall back to body scraping if postMessage didn't deliver it.
-        if (storedToken) return;
+        // If already set, skip body scraping but still redirect to /desktop-session.
+        if (storedToken) {
+          const sessionUrl = `https://openinstrument.com/desktop-session?instrument_uuid=${instrumentUuid}`;
+          mainWindow.loadURL(sessionUrl);
+          return;
+        }
         mainWindow.webContents.executeJavaScript(
           'document.body ? document.body.textContent.trim() : ""'
         ).then(text => {
@@ -406,6 +410,14 @@ async function createLoginWindow() {
         }
       } catch {
         event.preventDefault();
+      }
+    });
+
+    // Clear stored token whenever the user returns to the welcome screen so
+    // the next login always starts with a clean slate.
+    mainWindow.webContents.on('did-navigate', (_event, url) => {
+      if (url.includes('/desktop-welcome')) {
+        storedToken = null;
       }
     });
 
